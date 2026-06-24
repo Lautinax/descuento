@@ -6,122 +6,340 @@
     <title>Procesador de Descuentos y Notas de Crédito SAP</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 20px;
-            background-color: #f4f6f9;
-            color: #333;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        :root {
+            --navy-900: #0f1e3c;
+            --navy-800: #16294f;
+            --blue-700: #1d4ed8;
+            --blue-600: #2563eb;
+            --blue-500: #3b82f6;
+            --blue-50:  #eff6ff;
+            --slate-50: #f6f8fb;
+            --slate-100: #eef1f6;
+            --slate-200: #e2e8f0;
+            --slate-300: #cbd5e1;
+            --slate-500: #64748b;
+            --slate-600: #475569;
+            --slate-800: #1e293b;
+            --green-600: #059669;
+            --green-700: #047857;
+            --red-500: #e11d48;
+            --red-600: #dc2626;
+            --red-50: #fef1f3;
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --radius-sm: 7px;
+            --shadow-card: 0 1px 2px rgba(15, 30, 60, 0.04), 0 8px 24px -8px rgba(15, 30, 60, 0.08);
+            --shadow-card-hover: 0 2px 4px rgba(15, 30, 60, 0.06), 0 16px 32px -12px rgba(15, 30, 60, 0.12);
         }
-        h2 { color: #0056b3; }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 32px 20px;
+            background: radial-gradient(circle at top left, #eef3fb 0%, var(--slate-50) 45%, #eef1f6 100%);
+            color: var(--slate-800);
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.5;
+        }
+
+        h2 {
+            color: var(--navy-900);
+            margin: 0 0 28px 0;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--slate-200);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        h2::before {
+            content: "";
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--blue-500), var(--blue-700));
+            box-shadow: 0 0 0 4px var(--blue-50);
+        }
+
         .container {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            max-width: 1300px;
+            background: #ffffff;
+            padding: 32px 36px 40px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card);
+            border: 1px solid var(--slate-200);
+            max-width: 1400px;
             margin: auto;
             position: relative;
         }
+
+        /* Zona de arrastre premium */
         .drop-zone {
-            border: 2px dashed #0056b3;
-            padding: 30px;
+            border: 1.5px dashed #93b4ee;
+            padding: 36px 25px;
             text-align: center;
-            background: #eef5fc;
+            background:
+                linear-gradient(135deg, rgba(37,99,235,0.05), rgba(37,99,235,0.015)),
+                #fbfdff;
             cursor: pointer;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-weight: bold;
+            border-radius: var(--radius-md);
+            margin-bottom: 28px;
+            font-weight: 600;
+            font-size: 14.5px;
+            color: var(--blue-700);
+            letter-spacing: 0.01em;
+            transition: all 0.25s cubic-bezier(.4,0,.2,1);
+            position: relative;
         }
-        .drop-zone:hover { background: #e0eefe; }
-        .section {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            background: #fafafa;
+        .drop-zone::before {
+            content: "⇪";
+            display: block;
+            font-size: 26px;
+            margin-bottom: 8px;
+            color: var(--blue-500);
         }
+        .drop-zone:hover {
+            background:
+                linear-gradient(135deg, rgba(37,99,235,0.09), rgba(37,99,235,0.03)),
+                #fbfdff;
+            border-color: var(--blue-600);
+            box-shadow: 0 6px 20px -8px rgba(37,99,235,0.35);
+            transform: translateY(-1px);
+        }
+
+        #fileInfo {
+            font-weight: 600 !important;
+            color: var(--green-700) !important;
+            margin-bottom: 18px !important;
+            font-size: 13.5px;
+            display: inline-block;
+        }
+
+        /* Sección Formulario de Reglas Mejorado */
+        .section-reglas {
+            background: var(--slate-50);
+            border: 1px solid var(--slate-200);
+            border-radius: var(--radius-md);
+            padding: 22px 24px;
+            margin-bottom: 28px;
+            box-shadow: 0 1px 2px rgba(15,30,60,0.03);
+        }
+        .section-reglas h3 {
+            margin: 0 0 18px 0;
+            color: var(--navy-900);
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .form-regla {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-group label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--slate-500);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .input-mejorado {
+            padding: 10px 14px;
+            border: 1px solid var(--slate-300);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-family: inherit;
+            width: 220px;
+            outline: none;
+            background: #ffffff;
+            color: var(--slate-800);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-mejorado:focus {
+            border-color: var(--blue-500);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+        .input-porcentaje {
+            width: 110px;
+        }
+
+        .section-tabla {
+            margin-top: 24px;
+            padding: 22px 24px;
+            border: 1px solid var(--slate-200);
+            border-radius: var(--radius-md);
+            background: #ffffff;
+            box-shadow: 0 1px 2px rgba(15,30,60,0.03);
+        }
+        .section-tabla h3 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--navy-900);
+            letter-spacing: -0.01em;
+        }
+
+        /* Botones */
         .btn {
-            background-color: #007bff;
+            background: linear-gradient(180deg, var(--blue-600), var(--blue-700));
             color: white;
             border: none;
-            padding: 8px 15px;
+            padding: 10px 20px;
             cursor: pointer;
-            border-radius: 4px;
-            font-size: 14px;
+            border-radius: var(--radius-sm);
+            font-size: 13.5px;
+            font-family: inherit;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            align-self: flex-end; /* Alinea con el fondo de los inputs */
+            box-shadow: 0 1px 2px rgba(29,78,216,0.15), 0 4px 10px -4px rgba(29,78,216,0.35);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
         }
-        .btn:hover { background-color: #0056b3; }
-        .btn-success { background-color: #28a745; }
-        .btn-success:hover { background-color: #218838; }
-        .btn-danger { background-color: #dc3545; padding: 4px 8px; font-size: 12px;}
-        .btn-danger:hover { background-color: #c82333; }
+        .btn:hover {
+            background: linear-gradient(180deg, var(--blue-500), var(--blue-600));
+            box-shadow: 0 2px 4px rgba(29,78,216,0.18), 0 8px 16px -6px rgba(29,78,216,0.45);
+            transform: translateY(-1px);
+        }
+        .btn:active { transform: translateY(0); }
+        .btn-success { background: linear-gradient(180deg, #10b981, var(--green-600)); box-shadow: 0 1px 2px rgba(5,150,105,0.15), 0 4px 10px -4px rgba(5,150,105,0.4); }
+        .btn-success:hover { background: linear-gradient(180deg, #22c298, var(--green-700)); box-shadow: 0 2px 4px rgba(5,150,105,0.2), 0 8px 16px -6px rgba(5,150,105,0.5); }
+        .btn-danger { background: #fee2e6; color: var(--red-600); box-shadow: none; padding: 3px 9px; font-size: 11.5px; font-weight: 700; border-radius: 6px; margin-left: 6px; }
+        .btn-danger:hover { background: var(--red-500); color: #fff; transform: none; box-shadow: 0 2px 6px -2px rgba(225,29,72,0.5); }
+
+        /* Tabla */
         table {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 16px;
             font-size: 13px;
         }
         th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
+            padding: 12px 14px;
             text-align: left;
+            border-bottom: 1px solid var(--slate-200);
         }
-        th { background-color: #f2f2f2; position: sticky; top: 0; }
-        input[type="number"], input[type="text"] {
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+        th {
+            background: var(--navy-900);
+            position: sticky;
+            top: 0;
+            color: #e8edf8;
+            font-weight: 600;
+            font-size: 11.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: none;
+            z-index: 2;
         }
-        .input-table-desc { width: 60px; }
-        .rule-item {
-            display: inline-block;
-            background: #e2e3e5;
-            padding: 5px 10px;
-            margin: 5px;
-            border-radius: 4px;
-            font-size: 13px;
-        }
-        .txt-nc { color: #dc3545; font-weight: bold; }
+        th:first-child { border-top-left-radius: var(--radius-sm); }
+        th:last-child { border-top-right-radius: var(--radius-sm); }
+        tbody tr:nth-child(even) { background-color: var(--slate-50); }
+        tbody tr:hover { background-color: var(--blue-50); }
+        tbody tr td { color: var(--slate-800); }
 
-        /* Estilos de la nueva Ventana Emergente (Modal) */
+        .input-table-desc {
+            width: 55px;
+            padding: 6px 4px;
+            border: 1px solid var(--slate-300);
+            border-radius: 6px;
+            text-align: center;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--blue-700);
+            background: #fff;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .input-table-desc:focus {
+            outline: none;
+            border-color: var(--blue-500);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+
+        .rule-item {
+            display: inline-flex;
+            align-items: center;
+            background: var(--blue-50);
+            color: var(--navy-900);
+            padding: 7px 8px 7px 14px;
+            margin: 4px;
+            border-radius: 20px;
+            font-size: 12.5px;
+            font-weight: 500;
+            border: 1px solid #d6e4fb;
+        }
+        .txt-nc { color: var(--red-600); font-weight: 700; }
+
+        /* Estilos de la Ventana Emergente (Modal) */
         .modal-overlay {
             display: none;
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(3px);
             z-index: 1000;
             justify-content: center;
             align-items: center;
         }
         .modal-box {
-            background: white;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            background: #ffffff;
+            padding: 30px 32px 28px;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 16px rgba(15,23,42,0.12), 0 24px 48px -12px rgba(15,23,42,0.35);
             text-align: center;
             max-width: 400px;
             width: 100%;
+            border: 1px solid var(--slate-200);
+            border-top: 4px solid var(--red-500);
+            animation: modal-pop 0.2s cubic-bezier(.34,1.56,.64,1);
+        }
+        @keyframes modal-pop {
+            from { opacity: 0; transform: translateY(6px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .modal-box h3 {
             margin-top: 0;
-            color: #dc3545;
-            font-size: 22px;
-            border-bottom: 2px solid #f8d7da;
-            padding-bottom: 10px;
+            color: var(--navy-900);
+            font-size: 19px;
+            font-weight: 800;
+            letter-spacing: -0.01em;
+            border-bottom: 1px solid var(--slate-200);
+            padding-bottom: 14px;
+            margin-bottom: 14px;
         }
         .modal-box p {
-            font-size: 16px;
-            margin: 15px 0;
+            font-size: 14.5px;
+            color: var(--slate-600);
+            margin: 12px 0;
         }
         .modal-monto {
-            font-size: 24px;
-            font-weight: bold;
-            color: #dc3545;
-            background: #f8d7da;
-            padding: 10px;
-            border-radius: 5px;
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--red-600);
+            background: var(--red-50);
+            border: 1px solid #fbd5dc;
+            padding: 12px 18px;
+            border-radius: var(--radius-sm);
             display: inline-block;
-            margin: 10px 0;
+            margin: 8px 0 16px;
+            letter-spacing: -0.01em;
         }
+        .modal-box .btn { align-self: center; padding: 10px 28px; }
     </style>
 </head>
 <body>
@@ -135,18 +353,26 @@
     </div>
     <div id="fileInfo" style="font-weight: bold; color: green; margin-bottom: 10px;"></div>
 
-    <div class="section" id="secReglas" style="display:none;">
-        <h3>➕ Aplicar Regla Masiva por Texto (Ej: CRONOS = 10%)</h3>
-        <input type="text" id="reglaTexto" placeholder="Buscar texto (Ej: CRONOS)">
-        <input type="number" id="reglaPorcentaje" placeholder="Descuento %" min="0" max="100" step="0.5">
-        <button class="btn" onclick="agregarReglaMasiva()">Aplicar Regla</button>
-        <div id="listaReglas" style="margin-top: 10px;"></div>
+    <div class="section-reglas" id="secReglas" style="display:none;">
+        <h3>➕ Agregar regla de descuento masivo</h3>
+        <div class="form-regla">
+            <div class="form-group">
+                <label for="reglaTexto">Buscar texto en Material</label>
+                <input type="text" id="reglaTexto" class="input-mejorado" placeholder="Ej: CRONOS">
+            </div>
+            <div class="form-group">
+                <label for="reglaPorcentaje">Descuento (%)</label>
+                <input type="number" id="reglaPorcentaje" class="input-mejorado input-porcentaje" placeholder="Ej: 10" min="0" max="100" step="0.5">
+            </div>
+            <button class="btn" onclick="agregarReglaMasiva()">Aplicar Regla</button>
+        </div>
+        <div id="listaReglas" style="margin-top: 15px;"></div>
     </div>
 
-    <div class="section" id="secResultado" style="display:none;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>📋 Cálculo de Notas de Crédito por Fila</h3>
-            <button class="btn btn-success" onclick="exportarExcel()">📥 Exportar Excel de Notas de Crédito</button>
+    <div class="section-tabla" id="secResultado" style="display:none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3>📋 Vista Previa y Edición individual</h3>
+            <button class="btn btn-success" onclick="exportarExcel()">📥 Exportar Excel Corregido</button>
         </div>
         <div style="overflow-x:auto; max-height: 500px;">
             <table id="tablaDatos">
@@ -162,7 +388,7 @@
                         <th>Remito</th>
                         <th>Valor Neto SAP</th>
                         <th>% Desc</th>
-                        <th>Monto NC (A realizar)</th>
+                        <th>NC a emitir</th>
                         <th>Neto Corregido</th>
                     </tr>
                 </thead>
@@ -226,7 +452,7 @@
     }
 
     function procesarArchivo(file) {
-        document.getElementById('fileInfo').innerText = "Cargando archivo: " + file.name;
+        document.getElementById('fileInfo').innerText = "Último archivo: " + file.name;
         const reader = new FileReader();
         reader.onload = function(e) {
             const data = new Uint8Array(e.target.result);
@@ -299,7 +525,6 @@
         });
     }
 
-    // Al cambiar manualmente una fila, muestra la ventana con la NC de esa posición
     function actualizarDescuentoFila(index, valor) {
         let pct = parseFloat(valor) || 0;
         if(pct < 0) pct = 0;
@@ -308,14 +533,12 @@
         datosOriginales[index].porcentajeDesc = pct;
         renderizarTabla();
 
-        // Calcular NC individual para la ventana
         let montoNC = datosOriginales[index].valorNeto * (pct / 100);
         if (montoNC > 0) {
             mostrarVentanaNC(montoNC, `Monto de NC para la posición de ${datosOriginales[index].material}:`);
         }
     }
 
-    // Al aplicar regla masiva, calcula la NC acumulada de lo afectado y muestra la ventana
     function agregarReglaMasiva() {
         const texto = document.getElementById('reglaTexto').value.trim().toUpperCase();
         const porcentaje = parseFloat(document.getElementById('reglaPorcentaje').value);
@@ -341,13 +564,11 @@
         actualizarInterfazReglas();
         renderizarTabla();
 
-        // Lanzar cartel con el total de la NC calculada por esta regla
         if (ncAcumuladaRegla > 0) {
             mostrarVentanaNC(ncAcumuladaRegla, `Monto Total de NC a realizar por regla "${texto}" (${porcentaje}%):`);
         }
     }
 
-    // Funciones para controlar la ventana flotante
     function mostrarVentanaNC(monto, mensaje) {
         document.getElementById('modalDetalle').innerText = mensaje;
         document.getElementById('modalMonto').innerText = "$" + monto.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -408,15 +629,15 @@
                 'Remito': fila.remito,
                 'Valor Neto Original': fila.valorNeto,
                 '% Descuento': descPorcentaje + '%',
-                'Monto Nota de Crédito': montoNC,
+                'NC a emitir': montoNC,
                 'Valor Neto Corregido': valorCorregido
             };
         });
 
         filasExportar.push({});
         filasExportar.push({
-            'Material': 'TOTAL NC A REALIZAR:',
-            'Monto Nota de Crédito': totalNCGeneral
+            'Material': 'TOTAL NC A EMITIR:',
+            'NC a emitir': totalNCGeneral
         });
 
         const wb = XLSX.utils.book_new();
@@ -429,5 +650,3 @@
 
 </body>
 </html>
-
-
