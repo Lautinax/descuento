@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Descuentos SAP</title>
+    <title>Procesador de Descuentos y Notas de Crédito SAP</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {
@@ -18,8 +18,9 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            max-width: 1200px;
+            max-width: 1300px;
             margin: auto;
+            position: relative;
         }
         .drop-zone {
             border: 2px dashed #0056b3;
@@ -79,31 +80,73 @@
             border-radius: 4px;
             font-size: 13px;
         }
+        .txt-nc { color: #dc3545; font-weight: bold; }
+
+        /* Estilos de la nueva Ventana Emergente (Modal) */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        .modal-box h3 {
+            margin-top: 0;
+            color: #dc3545;
+            font-size: 22px;
+            border-bottom: 2px solid #f8d7da;
+            padding-bottom: 10px;
+        }
+        .modal-box p {
+            font-size: 16px;
+            margin: 15px 0;
+        }
+        .modal-monto {
+            font-size: 24px;
+            font-weight: bold;
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 10px;
+            border-radius: 5px;
+            display: inline-block;
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Procesador de Descuentos SAP</h2>
+    <h2>Procesador de Descuentos y Notas de Crédito SAP</h2>
     
     <div id="dropZone" class="drop-zone">
         Arrastrá acá tu archivo Excel exportado de SAP o hacé clic para seleccionar.
-        <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none">
+        <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none">
     </div>
     <div id="fileInfo" style="font-weight: bold; color: green; margin-bottom: 10px;"></div>
 
     <div class="section" id="secReglas" style="display:none;">
-        <h3>➕ Aplicar Regla Masiva por Texto (Ej: CRONOS = 5%)</h3>
+        <h3>➕ Aplicar Regla Masiva por Texto (Ej: CRONOS = 10%)</h3>
         <input type="text" id="reglaTexto" placeholder="Buscar texto (Ej: CRONOS)">
-        <input type="number" id="reglaPorcentaje" placeholder="Descuento %" min="0" max="100">
+        <input type="number" id="reglaPorcentaje" placeholder="Descuento %" min="0" max="100" step="0.5">
         <button class="btn" onclick="agregarReglaMasiva()">Aplicar Regla</button>
         <div id="listaReglas" style="margin-top: 10px;"></div>
     </div>
 
     <div class="section" id="secResultado" style="display:none;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>📋 Vista Previa y Edición Individual</h3>
-            <button class="btn btn-success" onclick="exportarExcel()">📥 Exportar Excel Corregido</button>
+            <h3>📋 Cálculo de Notas de Crédito por Fila</h3>
+            <button class="btn btn-success" onclick="exportarExcel()">📥 Exportar Excel de Notas de Crédito</button>
         </div>
         <div style="overflow-x:auto; max-height: 500px;">
             <table id="tablaDatos">
@@ -117,10 +160,10 @@
                         <th>Entrega</th>
                         <th>Pedido</th>
                         <th>Remito</th>
-                        <th>Valor Neto</th>
+                        <th>Valor Neto SAP</th>
                         <th>% Desc</th>
-                        <th>Valor Corregido</th>
-                        <th>Diferencia</th>
+                        <th>Monto NC (A realizar)</th>
+                        <th>Neto Corregido</th>
                     </tr>
                 </thead>
                 <tbody id="cuerpoTabla"></tbody>
@@ -129,22 +172,19 @@
     </div>
 </div>
 
+<div id="modalNC" class="modal-overlay">
+    <div class="modal-box">
+        <h3>📄 NC a realizar</h3>
+        <p id="modalDetalle">Se ha calculado la diferencia del descuento aplicado:</p>
+        <div id="modalMonto" class="modal-monto">$0,00</div>
+        <br><br>
+        <button class="btn" onclick="cerrarModal()">Entendido</button>
+    </div>
+</div>
+
 <script>
     let datosOriginales = [];
     let reglasMasivas = [];
-
-    // Ajustamos el mapeo invirtiendo los nombres para que coincidan con la realidad de SAP
-    const mapaColumnas = {
-        'FC Interna': 'FC Interna',
-        'FC AFIP': 'FC AFIP',
-        'Número de material': 'Material',            // En SAP, "Material" es el código numérico
-        'Material': 'Número de material',          // En SAP, "Número de material" es la descripción (CRONOS, etc)
-        'Ctd. facturada': 'Ctd.facturada',
-        'Entrega': 'Entrega',
-        'Pedido': 'Pedido',
-        'Remito': 'Remito',
-        'Valor Neto': 'Valor neto'
-    };
 
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
@@ -163,6 +203,28 @@
         if (e.target.files.length > 0) procesarArchivo(e.target.files[0]);
     });
 
+    function buscarPropiedad(objeto, nombreDeseado) {
+        const nombreLimpio = nombreDeseado.toLowerCase().replace(/\s+/g, '');
+        for (let clave in objeto) {
+            if (clave.toLowerCase().replace(/\s+/g, '') === nombreLimpio) {
+                return objeto[clave];
+            }
+        }
+        return undefined;
+    }
+
+    function limpiarNumeroSAP(valor) {
+        if (valor === undefined || valor === null || valor === '') return 0;
+        let str = String(valor).trim();
+        if (str.includes(',') && !str.includes('.')) {
+            str = str.replace(',', '.');
+        } else if (str.includes('.') && str.includes(',')) {
+            str = str.replace(/\./g, '').replace(',', '.');
+        }
+        let num = parseFloat(str.replace(/[^0-9.-]/g, ''));
+        return isNaN(num) ? 0 : num;
+    }
+
     function procesarArchivo(file) {
         document.getElementById('fileInfo').innerText = "Cargando archivo: " + file.name;
         const reader = new FileReader();
@@ -175,23 +237,23 @@
             const json = XLSX.utils.sheet_to_json(worksheet);
             
             if(json.length === 0) {
-                alert("El archivo está vacío.");
+                alert("El archivo está vacío o no se pudo leer correctamente.");
                 return;
             }
 
             datosOriginales = json.map(fila => {
-                let valorNeto = fila[mapaColumnas['Valor Neto']] ? parseFloat(String(fila[mapaColumnas['Valor Neto']]).replace(/[^0-9.-]/g, '')) : 0;
-                let ctdFacturada = fila[mapaColumnas['Ctd. facturada']] ? parseInt(fila[mapaColumnas['Ctd. facturada']]) : 0;
+                let valorNeto = limpiarNumeroSAP(buscarPropiedad(fila, 'Valor neto'));
+                let ctdFacturada = parseInt(buscarPropiedad(fila, 'Ctd.facturada')) || parseInt(buscarPropiedad(fila, 'Ctd. facturada')) || 0;
 
                 return {
-                    fcInterna: fila[mapaColumnas['FC Interna']] || '',
-                    fcAfip: fila[mapaColumnas['FC AFIP']] || '',
-                    numMaterial: fila[mapaColumnas['Número de material']] || '', // Ahora guarda el código numérico
-                    material: fila[mapaColumnas['Material']] || '',             // Ahora guarda la descripción de texto
+                    fcInterna: buscarPropiedad(fila, 'FC Interna') || '',
+                    fcAfip: buscarPropiedad(fila, 'FC AFIP') || '',
+                    numMaterial: buscarPropiedad(fila, 'Material') || '',
+                    material: buscarPropiedad(fila, 'Número de material') || '',
                     cantidad: ctdFacturada,
-                    entrega: fila[mapaColumnas['Entrega']] || '',
-                    pedido: fila[mapaColumnas['Pedido']] || '',
-                    remito: fila[mapaColumnas['Remito']] || '',
+                    entrega: buscarPropiedad(fila, 'Entrega') || '',
+                    pedido: buscarPropiedad(fila, 'Pedido') || '',
+                    remito: buscarPropiedad(fila, 'Remito') || '',
                     valorNeto: valorNeto,
                     porcentajeDesc: 0
                 };
@@ -212,8 +274,8 @@
 
         datosOriginales.forEach((fila, index) => {
             let descPorcentaje = fila.porcentajeDesc || 0;
-            let valorCorregido = fila.valorNeto * (1 - (descPorcentaje / 100));
-            let diferencia = fila.valorNeto - valorCorregido;
+            let montoNC = fila.valorNeto * (descPorcentaje / 100);
+            let valorCorregido = fila.valorNeto - montoNC;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -225,26 +287,35 @@
                 <td>${fila.entrega}</td>
                 <td>${fila.pedido}</td>
                 <td>${fila.remito}</td>
-                <td>$${fila.valorNeto.toFixed(2)}</td>
+                <td>$${fila.valorNeto.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>
                     <input type="number" class="input-table-desc" min="0" max="100" step="0.5" 
                            value="${descPorcentaje}" onchange="actualizarDescuentoFila(${index}, this.value)">%
                 </td>
-                <td><strong>$${valorCorregido.toFixed(2)}</strong></td>
-                <td style="color: red;">-$${diferencia.toFixed(2)}</td>
+                <td class="txt-nc">$${montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td><strong>$${valorCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
             `;
             tbody.appendChild(tr);
         });
     }
 
+    // Al cambiar manualmente una fila, muestra la ventana con la NC de esa posición
     function actualizarDescuentoFila(index, valor) {
         let pct = parseFloat(valor) || 0;
         if(pct < 0) pct = 0;
         if(pct > 100) pct = 100;
+        
         datosOriginales[index].porcentajeDesc = pct;
         renderizarTabla();
+
+        // Calcular NC individual para la ventana
+        let montoNC = datosOriginales[index].valorNeto * (pct / 100);
+        if (montoNC > 0) {
+            mostrarVentanaNC(montoNC, `Monto de NC para la posición de ${datosOriginales[index].material}:`);
+        }
     }
 
+    // Al aplicar regla masiva, calcula la NC acumulada de lo afectado y muestra la ventana
     function agregarReglaMasiva() {
         const texto = document.getElementById('reglaTexto').value.trim().toUpperCase();
         const porcentaje = parseFloat(document.getElementById('reglaPorcentaje').value);
@@ -256,9 +327,12 @@
 
         reglasMasivas.push({ texto, porcentaje });
         
+        let ncAcumuladaRegla = 0;
+
         datosOriginales.forEach(fila => {
-            if(fila.material.toUpperCase().includes(texto)) {
+            if(String(fila.material).toUpperCase().includes(texto)) {
                 fila.porcentajeDesc = porcentaje;
+                ncAcumuladaRegla += (fila.valorNeto * (porcentaje / 100));
             }
         });
 
@@ -266,6 +340,22 @@
         document.getElementById('reglaPorcentaje').value = '';
         actualizarInterfazReglas();
         renderizarTabla();
+
+        // Lanzar cartel con el total de la NC calculada por esta regla
+        if (ncAcumuladaRegla > 0) {
+            mostrarVentanaNC(ncAcumuladaRegla, `Monto Total de NC a realizar por regla "${texto}" (${porcentaje}%):`);
+        }
+    }
+
+    // Funciones para controlar la ventana flotante
+    function mostrarVentanaNC(monto, mensaje) {
+        document.getElementById('modalDetalle').innerText = mensaje;
+        document.getElementById('modalMonto').innerText = "$" + monto.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('modalNC').style.display = 'flex';
+    }
+
+    function cerrarModal() {
+        document.getElementById('modalNC').style.display = 'none';
     }
 
     function actualizarInterfazReglas() {
@@ -287,7 +377,7 @@
         datosOriginales.forEach(fila => fila.porcentajeDesc = 0);
         reglasMasivas.forEach(r => {
             datosOriginales.forEach(fila => {
-                if(fila.material.toUpperCase().includes(r.texto)) {
+                if(String(fila.material).toUpperCase().includes(r.texto)) {
                     fila.porcentajeDesc = r.porcentaje;
                 }
             });
@@ -299,13 +389,13 @@
     function exportarExcel() {
         if(datosOriginales.length === 0) return;
 
-        let totalDescuentoGeneral = 0;
+        let totalNCGeneral = 0;
 
         const filasExportar = datosOriginales.map(fila => {
             let descPorcentaje = fila.porcentajeDesc || 0;
-            let valorCorregido = fila.valorNeto * (1 - (descPorcentaje / 100));
-            let diferencia = fila.valorNeto - valorCorregido;
-            totalDescuentoGeneral += diferencia;
+            let montoNC = fila.valorNeto * (descPorcentaje / 100);
+            let valorCorregido = fila.valorNeto - montoNC;
+            totalNCGeneral += montoNC;
 
             return {
                 'FC Interna': fila.fcInterna,
@@ -318,22 +408,22 @@
                 'Remito': fila.remito,
                 'Valor Neto Original': fila.valorNeto,
                 '% Descuento': descPorcentaje + '%',
-                'Valor Corregido': valorCorregido,
-                'Diferencia (Descuento)': diferencia
+                'Monto Nota de Crédito': montoNC,
+                'Valor Neto Corregido': valorCorregido
             };
         });
 
         filasExportar.push({});
         filasExportar.push({
-            'Material': 'TOTAL DESCUENTO OTORGADO:',
-            'Diferencia (Descuento)': totalDescuentoGeneral
+            'Material': 'TOTAL NC A REALIZAR:',
+            'Monto Nota de Crédito': totalNCGeneral
         });
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(filasExportar);
-        XLSX.utils.book_append_sheet(wb, ws, "Descuentos Aplicados");
+        XLSX.utils.book_append_sheet(wb, ws, "Notas de Crédito");
         
-        XLSX.writeFile(wb, "SAP_Facturacion_Con_Descuentos.xlsx");
+        XLSX.writeFile(wb, "SAP_Reporte_Notas_De_Credito.xlsx");
     }
 </script>
 
