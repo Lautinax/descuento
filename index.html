@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Descuentos SAP - Sucesivos Horizontales</title>
+    <title>Procesador de Descuentos SAP - Chips Horizontales</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {
@@ -120,7 +120,7 @@
         }
         th, td {
             border: 1px solid #dee2e6;
-            padding: 5px 6px;
+            padding: 6px 8px;
             text-align: left;
             vertical-align: middle;
         }
@@ -134,12 +134,11 @@
         }
         tr:hover { background-color: #f8f9fa; }
         
-        /* Contenedor horizontal de los descuentos dentro de la celda */
+        /* Contenedor horizontal estable de los descuentos */
         .celda-descuentos-wrapper {
             display: flex;
             align-items: center;
             gap: 6px;
-            flex-wrap: nowrap; /* Evita que se vayan para abajo, siempre horizontal */
         }
         .lista-chips-horizontal {
             display: flex;
@@ -165,11 +164,12 @@
             border: none;
             background: none;
             padding: 0 2px;
+            font-size: 12px;
         }
         .chip-desc .btn-borrar-chip:hover { color: #bd2130; }
 
         .input-table-desc-mini { 
-            width: 35px; 
+            width: 40px; 
             padding: 3px; 
             border: 1px solid #ced4da; 
             border-radius: 3px; 
@@ -180,7 +180,7 @@
             background: #6c757d;
             color: white;
             border: none;
-            padding: 2px 6px;
+            padding: 3px 8px;
             border-radius: 3px;
             cursor: pointer;
             font-size: 11px;
@@ -276,7 +276,7 @@
                         <th>Pedido</th>
                         <th>Remito</th>
                         <th>Valor Neto SAP</th>
-                        <th style="min-width: 180px;">% Descuentos Acumulados</th>
+                        <th style="min-width: 220px;">% Descuentos Acumulados</th>
                         <th>NC a emitir</th>
                         <th>Neto Corregido</th>
                     </tr>
@@ -338,7 +338,6 @@
         return isNaN(num) ? 0 : num;
     }
 
-    // Calcula el valor acumulado en base al array de descuentos
     function calcularNetoConListaDescuentos(valorNetoInicial, listaDescuentos) {
         let valorActual = valorNetoInicial;
         listaDescuentos.forEach(pct => {
@@ -384,7 +383,7 @@
                     pedido: buscarPropiedad(fila, 'Pedido') || '',
                     remito: buscarPropiedad(fila, 'Remito') || '',
                     valorNeto: valorNeto,
-                    descuentosArr: [] // Guardamos los porcentajes como un array [25, 5, 3]
+                    descuentosArr: [] 
                 };
             });
 
@@ -408,9 +407,10 @@
             sumaTotalNC += calculo.montoNC;
 
             const tr = document.createElement('tr');
-            
-            // Creamos los chips horizontales de descuento
-            let chipsHTML = `<div class="lista-chips-horizontal">`;
+            tr.id = `fila_${index}`;
+
+            // Contenedor de chips horizontales
+            let chipsHTML = `<div class="lista-chips-horizontal" id="chips_container_${index}">`;
             fila.descuentosArr.forEach((desc, dIdx) => {
                 chipsHTML += `
                     <span class="chip-desc">
@@ -434,12 +434,12 @@
                     <div class="celda-descuentos-wrapper">
                         ${chipsHTML}
                         <input type="text" class="input-table-desc-mini" placeholder="0" 
-                               id="inputDesc_${index}" onkeydown="if(event.key==='Enter') agregarDescuentoFila(${index})">
+                               id="inputDesc_${index}" onkeydown="if(event.key==='Enter') { event.preventDefault(); agregarDescuentoFila(${index}); }">
                         <button class="btn-add-desc-mini" onclick="agregarDescuentoFila(${index})">+</button>
                     </div>
                 </td>
-                <td class="txt-nc">$${calculo.montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td><strong>$${calculo.netoCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td class="txt-nc" id="monto_nc_${index}">$${calculo.montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td id="neto_corregido_${index}"><strong>$${calculo.netoCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
             `;
             tbody.appendChild(tr);
         });
@@ -447,7 +447,36 @@
         document.getElementById('totalNcCuadro').innerText = "$" + sumaTotalNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
-    // Agrega un descuento individual a la lista horizontal de esa fila
+    // Actualiza valores específicos de la fila sin romper los focos del teclado
+    function actualizarValoresFilaDinamico(index) {
+        let fila = datosOriginales[index];
+        let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosArr);
+
+        // Actualizar contenedor de chips
+        let container = document.getElementById(`chips_container_${index}`);
+        let chipsHTML = "";
+        fila.descuentosArr.forEach((desc, dIdx) => {
+            chipsHTML += `
+                <span class="chip-desc">
+                    ${desc}%
+                    <button class="btn-borrar-chip" onclick="eliminarDescuentoEspecifico(${index}, ${dIdx})">×</button>
+                </span>`;
+        });
+        container.innerHTML = chipsHTML;
+
+        // Actualizar totales de la fila
+        document.getElementById(`monto_nc_${index}`).innerText = "$" + calculo.montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById(`neto_corregido_${index}`).innerHTML = "<strong>$" + calculo.netoCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + "</strong>";
+
+        // Recalcular el cuadro grande general de abajo
+        let sumaTotalNC = 0;
+        datosOriginales.forEach(f => {
+            let c = calcularNetoConListaDescuentos(f.valorNeto, f.descuentosArr);
+            sumaTotalNC += c.montoNC;
+        });
+        document.getElementById('totalNcCuadro').innerText = "$" + sumaTotalNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
     function agregarDescuentoFila(index) {
         const input = document.getElementById(`inputDesc_${index}`);
         let valorRaw = input.value.trim().replace(',', '.');
@@ -456,18 +485,17 @@
         if (!isNaN(valor) && valor > 0) {
             if (valor > 100) valor = 100;
             datosOriginales[index].descuentosArr.push(valor);
-            renderizarTabla();
-            // Mantenemos el foco en el input por si querés cargar otro rápido
-            document.getElementById(`inputDesc_${index}`).focus();
+            input.value = ''; // Vacía el cuadrito al toque
+            actualizarValoresFilaDinamico(index);
+            input.focus();
         } else {
             input.value = '';
         }
     }
 
-    // Elimina un chip específico haciendo clic en su 'x'
     function eliminarDescuentoEspecifico(filaIdx, descIdx) {
         datosOriginales[filaIdx].descuentosArr.splice(descIdx, 1);
-        renderizarTabla();
+        actualizarValoresFilaDinamico(filaIdx);
     }
 
     function agregarReglaMasiva() {
@@ -509,7 +537,6 @@
 
     function eliminarReglaMasiva(idx) {
         reglasMasivas.splice(idx, 1);
-        // Reseteamos y volvemos a aplicar las reglas que quedaron
         datosOriginales.forEach(fila => fila.descuentosArr = []);
         reglasMasivas.forEach(r => {
             datosOriginales.forEach(fila => {
@@ -531,7 +558,6 @@
             let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosArr);
             totalNCGeneral += calculo.montoNC;
 
-            // Unimos los descuentos con un signo '+' para el reporte final en Excel
             let stringDescuentos = fila.descuentosArr.map(d => d + '%').join(' + ');
 
             return {
