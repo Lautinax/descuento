@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Procesador de Descuentos SAP</title>
-    <!-- Cargamos SheetJS para procesar los archivos Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {
@@ -15,7 +14,7 @@
         }
         h2 { 
             color: #212529; 
-            font-size: 22px; 
+            font-size: 20px; 
             margin-bottom: 15px; 
             font-weight: 600;
         }
@@ -29,7 +28,7 @@
         }
         .drop-zone {
             border: 1.5px dashed #0056b3;
-            padding: 15px;
+            padding: 12px;
             text-align: center;
             background: #f0f6fc;
             cursor: pointer;
@@ -46,17 +45,17 @@
             background: #ffffff;
             border: 1px solid #dee2e6;
             border-radius: 4px;
-            padding: 12px;
+            padding: 10px;
             margin-bottom: 15px;
             display: flex;
             flex-direction: column;
-            align-items: center; /* Centraliza el contenido */
+            align-items: center;
         }
         .section-reglas h3 {
             margin-top: 0;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: #495057;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
         }
         .form-regla {
@@ -71,19 +70,19 @@
             gap: 8px;
         }
         .form-group label {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             color: #495057;
         }
         .input-mejorado {
-            padding: 6px 10px;
+            padding: 5px 8px;
             border: 1px solid #ced4da;
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 12px;
             outline: none;
         }
         .input-material { width: 180px; }
-        .input-porcentaje { width: 70px; text-align: center; }
+        .input-porcentaje { width: 60px; text-align: center; }
 
         .section-tabla {
             margin-top: 10px;
@@ -98,32 +97,33 @@
             background-color: #0056b3;
             color: white;
             border: none;
-            padding: 6px 14px;
+            padding: 5px 12px;
             cursor: pointer;
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 500;
         }
         .btn:hover { background-color: #004085; }
         .btn-success { background-color: #28a745; }
         .btn-success:hover { background-color: #1e7e34; }
-        .btn-danger { background-color: #dc3545; padding: 2px 6px; font-size: 11px; border-radius: 3px; margin-left: 5px;}
+        .btn-danger { background-color: #dc3545; padding: 2px 5px; font-size: 10px; border-radius: 3px; margin-left: 5px;}
         .btn-danger:hover { background-color: #bd2130; }
         
         /* Tabla ultra compacta */
         .tabla-contenedor {
             overflow-x: auto; 
-            max-height: 480px; 
+            max-height: 400px; 
             border: 1px solid #dee2e6;
+            margin-bottom: 15px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
+            font-size: 11px;
         }
         th, td {
             border: 1px solid #dee2e6;
-            padding: 6px 8px; /* Más compacto */
+            padding: 5px 6px;
             text-align: left;
         }
         th { 
@@ -137,37 +137,53 @@
         tr:hover { background-color: #f8f9fa; }
         
         .input-table-desc { 
-            width: 45px; 
-            padding: 3px; 
+            width: 40px; 
+            padding: 2px; 
             border: 1px solid #ced4da; 
             border-radius: 3px; 
             text-align: center; 
-            font-size: 12px;
+            font-size: 11px;
         }
         .rule-item {
             display: inline-block;
             background: #f1f3f5;
-            padding: 4px 10px;
-            margin: 4px;
+            padding: 3px 8px;
+            margin: 3px;
             border-radius: 4px;
-            font-size: 12px;
+            font-size: 11px;
             border: 1px solid #ced4da;
         }
         .txt-nc { color: #dc3545; font-weight: bold; }
         
-        /* Fila de Totales inferior */
-        .fila-totales {
-            background-color: #e9ecef;
-            font-size: 14px;
+        /* CUADRO DE RESUMEN DESTACADO ABAJO DE TODO */
+        .cuadro-resumen-final {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+        }
+        .tarjeta-total {
+            background-color: #fff5f5;
+            border: 2px solid #feb2b2;
+            border-radius: 6px;
+            padding: 12px 25px;
+            text-align: right;
+            box-shadow: 0 2px 4px rgba(220, 53, 69, 0.05);
+        }
+        .tarjeta-total label {
+            font-size: 12px;
             font-weight: bold;
+            color: #c53030;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 4px;
         }
-        .fila-totales td {
-            padding: 10px;
-            border-top: 2px solid #ced4da;
-        }
-        .total-destacado {
-            color: #dc3545;
-            font-size: 16px;
+        .tarjeta-total .monto {
+            font-size: 22px;
+            font-weight: 800;
+            color: #e53e3e;
         }
     </style>
 </head>
@@ -176,14 +192,12 @@
 <div class="container">
     <h2>Procesador de Descuentos SAP</h2>
     
-    <!-- 1. Zona de Carga -->
     <div id="dropZone" class="drop-zone">
         Arrastrá acá tu archivo Excel exportado de SAP o hacé clic para seleccionar.
         <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none">
     </div>
-    <div id="fileInfo" style="font-size: 12px; font-weight: bold; color: #28a745; margin-bottom: 8px;"></div>
+    <div id="fileInfo" style="font-size: 11px; font-weight: bold; color: #28a745; margin-bottom: 8px;"></div>
 
-    <!-- 2. Sección de Reglas Masivas Centralizada y Compacta -->
     <div class="section-reglas" id="secReglas" style="display:none;">
         <h3>➕ Agregar regla de descuento masivo</h3>
         <div class="form-regla">
@@ -193,17 +207,16 @@
             </div>
             <div class="form-group">
                 <label>Descuento (%):</label>
-                <input type="number" id="reglaPorcentaje" class="input-mejorado input-porcentaje" placeholder="Ej: 8" min="0" max="100" step="0.5">
+                <input type="number" id="reglaPorcentaje" class="input-mejorado input-porcentaje" placeholder="Ej: 10" min="0" max="100" step="0.5">
             </div>
             <button class="btn" onclick="agregarReglaMasiva()">Aplicar Regla</button>
         </div>
-        <div id="listaReglas" style="margin-top: 8px; text-align: center;"></div>
+        <div id="listaReglas" style="margin-top: 6px; text-align: center;"></div>
     </div>
 
-    <!-- 3. Tabla y Exportación -->
     <div class="section-tabla" id="secResultado" style="display:none;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="margin: 0; font-size: 14px; color: #495057;">📋 Vista Previa y Edición individual</h3>
+            <h3 style="margin: 0; font-size: 13px; color: #495057;">📋 Vista Previa y Edición individual</h3>
             <button class="btn btn-success" onclick="exportarExcel()">📥 Exportar Excel Corregido</button>
         </div>
         
@@ -226,15 +239,16 @@
                     </tr>
                 </thead>
                 <tbody id="cuerpoTabla"></tbody>
-                <tfoot>
-                    <tr class="fila-totales">
-                        <td colspan="10" style="text-align: right;">TOTAL NC A REALIZAR:</td>
-                        <td id="totalNcAbajo" class="total-destacado">$0,00</td>
-                        <td id="totalNetoCorregidoAbajo">$0,00</td>
-                    </tr>
-                </tfoot>
             </table>
         </div>
+
+        <div class="cuadro-resumen-final">
+            <div class="tarjeta-total">
+                <label>Total de NC a realizar</label>
+                <div id="totalNcCuadro" class="monto">$0,00</div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -329,7 +343,6 @@
         tbody.innerHTML = '';
 
         let sumaTotalNC = 0;
-        let sumaTotalNetoCorregido = 0;
 
         datosOriginales.forEach((fila, index) => {
             let descPorcentaje = fila.porcentajeDesc || 0;
@@ -337,7 +350,6 @@
             let valorCorregido = fila.valorNeto - montoNC;
 
             sumaTotalNC += montoNC;
-            sumaTotalNetoCorregido += valorCorregido;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -360,9 +372,8 @@
             tbody.appendChild(tr);
         });
 
-        // Actualiza dinámicamente los totales inferiores en la tabla
-        document.getElementById('totalNcAbajo').innerText = "$" + sumaTotalNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        document.getElementById('totalNetoCorregidoAbajo').innerText = "$" + sumaTotalNetoCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        // Actualiza el cuadro destacado con el total de la NC
+        document.getElementById('totalNcCuadro').innerText = "$" + sumaTotalNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
     function actualizarDescuentoFila(index, valor) {
