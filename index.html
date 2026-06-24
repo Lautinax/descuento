@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Procesador de Descuentos SAP - Sucesivos</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Descuentos SAP - Sucesivos Horizontales</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 10px 20px;
@@ -39,6 +39,7 @@
             color: #0056b3;
         }
         .drop-zone:hover { background: #e2eefa; }
+        
         .section-reglas {
             background: #ffffff;
             border: 1px solid #dee2e6;
@@ -80,8 +81,8 @@
             outline: none;
         }
         .input-material { width: 180px; }
-        .input-porcentaje { width: 110px; text-align: center; }
- 
+        .input-porcentaje { width: 60px; text-align: center; }
+
         .section-tabla {
             margin-top: 10px;
             border: 1px solid #dee2e6;
@@ -89,6 +90,7 @@
             background: #ffffff;
             padding: 12px;
         }
+        
         .btn {
             background-color: #0056b3;
             color: white;
@@ -104,6 +106,7 @@
         .btn-success:hover { background-color: #1e7e34; }
         .btn-danger { background-color: #dc3545; padding: 2px 5px; font-size: 10px; border-radius: 3px; margin-left: 5px;}
         .btn-danger:hover { background-color: #bd2130; }
+        
         .tabla-contenedor {
             overflow-x: auto; 
             max-height: 400px; 
@@ -119,6 +122,7 @@
             border: 1px solid #dee2e6;
             padding: 5px 6px;
             text-align: left;
+            vertical-align: middle;
         }
         th { 
             background-color: #f8f9fa; 
@@ -129,14 +133,61 @@
             z-index: 10;
         }
         tr:hover { background-color: #f8f9fa; }
-        .input-table-desc { 
-            width: 85px; 
-            padding: 2px; 
+        
+        /* Contenedor horizontal de los descuentos dentro de la celda */
+        .celda-descuentos-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: nowrap; /* Evita que se vayan para abajo, siempre horizontal */
+        }
+        .lista-chips-horizontal {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .chip-desc {
+            display: inline-flex;
+            align-items: center;
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #495057;
+        }
+        .chip-desc .btn-borrar-chip {
+            color: #dc3545;
+            margin-left: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            background: none;
+            padding: 0 2px;
+        }
+        .chip-desc .btn-borrar-chip:hover { color: #bd2130; }
+
+        .input-table-desc-mini { 
+            width: 35px; 
+            padding: 3px; 
             border: 1px solid #ced4da; 
             border-radius: 3px; 
             text-align: center; 
             font-size: 11px;
         }
+        .btn-add-desc-mini {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .btn-add-desc-mini:hover { background: #5a6268; }
+
         .rule-item {
             display: inline-block;
             background: #f1f3f5;
@@ -147,6 +198,7 @@
             border: 1px solid #ced4da;
         }
         .txt-nc { color: #dc3545; font-weight: bold; }
+        
         .cuadro-resumen-final {
             display: flex;
             justify-content: flex-end;
@@ -176,78 +228,80 @@
             font-weight: 800;
             color: #e53e3e;
         }
-</style>
+    </style>
 </head>
 <body>
- 
+
 <div class="container">
-<h2>Procesador de Descuentos SAP (Encadenados)</h2>
-<div id="dropZone" class="drop-zone">
+    <h2>Procesador de Descuentos SAP (Chips Horizontales)</h2>
+    
+    <div id="dropZone" class="drop-zone">
         Arrastrá acá tu archivo Excel exportado de SAP o hacé clic para seleccionar.
-<input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none">
-</div>
-<div id="fileInfo" style="font-size: 11px; font-weight: bold; color: #28a745; margin-bottom: 8px;"></div>
- 
+        <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none">
+    </div>
+    <div id="fileInfo" style="font-size: 11px; font-weight: bold; color: #28a745; margin-bottom: 8px;"></div>
+
     <div class="section-reglas" id="secReglas" style="display:none;">
-<h3>➕ Agregar regla de descuento masivo</h3>
-<div class="form-regla">
-<div class="form-group">
-<label>Buscar texto en Material:</label>
-<input type="text" id="reglaTexto" class="input-mejorado input-material" placeholder="PANDORA, CRONOS...">
-</div>
-<div class="form-group">
-<label>Descuento (Ej: 25+5+3):</label>
-<input type="text" id="reglaPorcentaje" class="input-mejorado input-porcentaje" placeholder="25+5+3">
-</div>
-<button class="btn" onclick="agregarReglaMasiva()">Aplicar Regla</button>
-</div>
-<div id="listaReglas" style="margin-top: 6px; text-align: center;"></div>
-</div>
- 
+        <h3>➕ Agregar regla de descuento masivo</h3>
+        <div class="form-regla">
+            <div class="form-group">
+                <label>Buscar texto en Material:</label>
+                <input type="text" id="reglaTexto" class="input-mejorado input-material" placeholder="PANDORA, CRONOS...">
+            </div>
+            <div class="form-group">
+                <label>Descuento (%):</label>
+                <input type="number" id="reglaPorcentaje" class="input-mejorado input-porcentaje" placeholder="Ej: 25" step="0.5">
+            </div>
+            <button class="btn" onclick="agregarReglaMasiva()">Aplicar Regla</button>
+        </div>
+        <div id="listaReglas" style="margin-top: 6px; text-align: center;"></div>
+    </div>
+
     <div class="section-tabla" id="secResultado" style="display:none;">
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-<h3 style="margin: 0; font-size: 13px; color: #495057;">📋 Vista Previa y Edición individual</h3>
-<button class="btn btn-success" onclick="exportarExcel()">📥 Exportar Excel Corregido</button>
-</div>
-<div class="tabla-contenedor">
-<table id="tablaDatos">
-<thead>
-<tr>
-<th>FC Interna</th>
-<th>FC AFIP</th>
-<th>Código Material</th>
-<th>Descripción Material</th>
-<th>Ctd. facturada</th>
-<th>Entrega</th>
-<th>Pedido</th>
-<th>Remito</th>
-<th>Valor Neto SAP</th>
-<th>% Desc (Ej: 25+5)</th>
-<th>NC a emitir</th>
-<th>Neto Corregido</th>
-</tr>
-</thead>
-<tbody id="cuerpoTabla"></tbody>
-</table>
-</div>
- 
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 13px; color: #495057;">📋 Vista Previa y Edición individual</h3>
+            <button class="btn btn-success" onclick="exportarExcel()">📥 Exportar Excel Corregido</button>
+        </div>
+        
+        <div class="tabla-contenedor">
+            <table id="tablaDatos">
+                <thead>
+                    <tr>
+                        <th>FC Interna</th>
+                        <th>FC AFIP</th>
+                        <th>Código Material</th>
+                        <th>Descripción Material</th>
+                        <th>Ctd. facturada</th>
+                        <th>Entrega</th>
+                        <th>Pedido</th>
+                        <th>Remito</th>
+                        <th>Valor Neto SAP</th>
+                        <th style="min-width: 180px;">% Descuentos Acumulados</th>
+                        <th>NC a emitir</th>
+                        <th>Neto Corregido</th>
+                    </tr>
+                </thead>
+                <tbody id="cuerpoTabla"></tbody>
+            </table>
+        </div>
+
         <div class="cuadro-resumen-final">
-<div class="tarjeta-total">
-<label>Total de NC a realizar</label>
-<div id="totalNcCuadro" class="monto">$0,00</div>
-</div>
-</div>
- 
+            <div class="tarjeta-total">
+                <label>Total de NC a realizar</label>
+                <div id="totalNcCuadro" class="monto">$0,00</div>
+            </div>
+        </div>
+
     </div>
 </div>
- 
+
 <script>
     let datosOriginales = [];
     let reglasMasivas = [];
- 
+
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
- 
+
     dropZone.addEventListener('click', () => fileInput.click());
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = '#e2eefa'; });
     dropZone.addEventListener('dragleave', () => dropZone.style.background = '#f0f6fc');
@@ -261,7 +315,7 @@
     fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) procesarArchivo(e.target.files[0]);
     });
- 
+
     function buscarPropiedad(objeto, nombreDeseado) {
         const nombreLimpio = nombreDeseado.toLowerCase().replace(/\s+/g, '');
         for (let clave in objeto) {
@@ -271,7 +325,7 @@
         }
         return undefined;
     }
- 
+
     function limpiarNumeroSAP(valor) {
         if (valor === undefined || valor === null || valor === '') return 0;
         let str = String(valor).trim();
@@ -283,27 +337,20 @@
         let num = parseFloat(str.replace(/[^0-9.-]/g, ''));
         return isNaN(num) ? 0 : num;
     }
- 
-    function calcularNetoConDescuentosSucesivos(valorNetoInicial, cadenaDescuentos) {
-        if (!cadenaDescuentos) return { netoCorregido: valorNetoInicial, montoNC: 0 };
-        // Permite números con punto o coma, separados por '+' o espacios
-        let normalizada = cadenaDescuentos.toString().replace(/,/g, '.');
-        let descuentos = normalizada.replace(/[^0-9. +]/g, '').split(/[ +]+/);
+
+    // Calcula el valor acumulado en base al array de descuentos
+    function calcularNetoConListaDescuentos(valorNetoInicial, listaDescuentos) {
         let valorActual = valorNetoInicial;
-        descuentos.forEach(d => {
-            let pct = parseFloat(d);
-            if (!isNaN(pct) && pct > 0) {
-                if (pct > 100) pct = 100;
+        listaDescuentos.forEach(pct => {
+            if (pct > 0) {
                 valorActual = valorActual * (1 - (pct / 100));
             }
         });
- 
         let netoCorregido = valorActual;
         let montoNC = valorNetoInicial - netoCorregido;
- 
         return { netoCorregido, montoNC };
     }
- 
+
     function procesarArchivo(file) {
         document.getElementById('fileInfo').innerText = "Último archivo: " + file.name;
         const reader = new FileReader();
@@ -312,20 +359,21 @@
             const workbook = XLSX.read(data, {type: 'array'});
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
+            
             const json = XLSX.utils.sheet_to_json(worksheet);
+            
             if(json.length === 0) {
                 alert("El archivo está vacío o no se pudo leer correctamente.");
                 return;
             }
- 
+
             datosOriginales = json.map(fila => {
                 let valorNeto = limpiarNumeroSAP(buscarPropiedad(fila, 'Valor neto'));
                 let ctdFacturada = parseInt(buscarPropiedad(fila, 'Ctd.facturada')) || parseInt(buscarPropiedad(fila, 'Ctd. facturada')) || 0;
- 
-                // Mapeo corregido según la estructura real de tu reporte SAP
+
                 let codigoMat = buscarPropiedad(fila, 'Material') || '';
                 let descMat = buscarPropiedad(fila, 'Número de material') || '';
- 
+
                 return {
                     fcInterna: buscarPropiedad(fila, 'FC Interna') || '',
                     fcAfip: buscarPropiedad(fila, 'FC AFIP') || '',
@@ -336,10 +384,10 @@
                     pedido: buscarPropiedad(fila, 'Pedido') || '',
                     remito: buscarPropiedad(fila, 'Remito') || '',
                     valorNeto: valorNeto,
-                    cadenaDesc: ''
+                    descuentosArr: [] // Guardamos los porcentajes como un array [25, 5, 3]
                 };
             });
- 
+
             document.getElementById('secReglas').style.display = 'flex';
             document.getElementById('secResultado').style.display = 'block';
             reglasMasivas = [];
@@ -348,105 +396,144 @@
         };
         reader.readAsArrayBuffer(file);
     }
- 
+
     function renderizarTabla() {
         const tbody = document.getElementById('cuerpoTabla');
         tbody.innerHTML = '';
- 
+
         let sumaTotalNC = 0;
- 
+
         datosOriginales.forEach((fila, index) => {
-            let calculo = calcularNetoConDescuentosSucesivos(fila.valorNeto, fila.cadenaDesc);
+            let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosArr);
             sumaTotalNC += calculo.montoNC;
- 
+
             const tr = document.createElement('tr');
+            
+            // Creamos los chips horizontales de descuento
+            let chipsHTML = `<div class="lista-chips-horizontal">`;
+            fila.descuentosArr.forEach((desc, dIdx) => {
+                chipsHTML += `
+                    <span class="chip-desc">
+                        ${desc}%
+                        <button class="btn-borrar-chip" onclick="eliminarDescuentoEspecifico(${index}, ${dIdx})">×</button>
+                    </span>`;
+            });
+            chipsHTML += `</div>`;
+
             tr.innerHTML = `
-<td>${fila.fcInterna}</td>
-<td>${fila.fcAfip}</td>
-<td>${fila.numMaterial}</td>
-<td><strong>${fila.material}</strong></td>
-<td>${fila.cantidad}</td>
-<td>${fila.entrega}</td>
-<td>${fila.pedido}</td>
-<td>${fila.remito}</td>
-<td>$${fila.valorNeto.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-<td>
-<input type="text" class="input-table-desc" 
-                           value="${fila.cadenaDesc}" placeholder="0" onchange="actualizarDescuentoFila(${index}, this.value)">
-</td>
-<td class="txt-nc">$${calculo.montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-<td><strong>$${calculo.netoCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td>${fila.fcInterna}</td>
+                <td>${fila.fcAfip}</td>
+                <td>${fila.numMaterial}</td>
+                <td><strong>${fila.material}</strong></td>
+                <td>${fila.cantidad}</td>
+                <td>${fila.entrega}</td>
+                <td>${fila.pedido}</td>
+                <td>${fila.remito}</td>
+                <td>$${fila.valorNeto.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td>
+                    <div class="celda-descuentos-wrapper">
+                        ${chipsHTML}
+                        <input type="text" class="input-table-desc-mini" placeholder="0" 
+                               id="inputDesc_${index}" onkeydown="if(event.key==='Enter') agregarDescuentoFila(${index})">
+                        <button class="btn-add-desc-mini" onclick="agregarDescuentoFila(${index})">+</button>
+                    </div>
+                </td>
+                <td class="txt-nc">$${calculo.montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td><strong>$${calculo.netoCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
             `;
             tbody.appendChild(tr);
         });
- 
+
         document.getElementById('totalNcCuadro').innerText = "$" + sumaTotalNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
- 
-    function actualizarDescuentoFila(index, valor) {
-        datosOriginales[index].cadenaDesc = valor.trim();
+
+    // Agrega un descuento individual a la lista horizontal de esa fila
+    function agregarDescuentoFila(index) {
+        const input = document.getElementById(`inputDesc_${index}`);
+        let valorRaw = input.value.trim().replace(',', '.');
+        let valor = parseFloat(valorRaw);
+
+        if (!isNaN(valor) && valor > 0) {
+            if (valor > 100) valor = 100;
+            datosOriginales[index].descuentosArr.push(valor);
+            renderizarTabla();
+            // Mantenemos el foco en el input por si querés cargar otro rápido
+            document.getElementById(`inputDesc_${index}`).focus();
+        } else {
+            input.value = '';
+        }
+    }
+
+    // Elimina un chip específico haciendo clic en su 'x'
+    function eliminarDescuentoEspecifico(filaIdx, descIdx) {
+        datosOriginales[filaIdx].descuentosArr.splice(descIdx, 1);
         renderizarTabla();
     }
- 
+
     function agregarReglaMasiva() {
         const texto = document.getElementById('reglaTexto').value.trim().toUpperCase();
-        const cadenaPorcentajes = document.getElementById('reglaPorcentaje').value.trim();
- 
-        if(!texto || !cadenaPorcentajes) {
-            alert("Por favor completá el término de búsqueda y la cadena de descuento (Ej: 25+5).");
+        const porcentaje = parseFloat(document.getElementById('reglaPorcentaje').value);
+
+        if(!texto || isNaN(porcentaje) || porcentaje <= 0) {
+            alert("Por favor completá el término de búsqueda y un porcentaje válido.");
             return;
         }
- 
-        reglasMasivas.push({ texto, cadenaPorcentajes });
- 
+
+        reglasMasivas.push({ texto, porcentaje });
+
         datosOriginales.forEach(fila => {
             if(String(fila.material).toUpperCase().includes(texto)) {
-                fila.cadenaDesc = cadenaPorcentajes;
+                fila.descuentosArr.push(porcentaje);
             }
         });
- 
+
         document.getElementById('reglaTexto').value = '';
         document.getElementById('reglaPorcentaje').value = '';
         actualizarInterfazReglas();
         renderizarTabla();
     }
- 
+
     function actualizarInterfazReglas() {
         const div = document.getElementById('listaReglas');
-        div.innerHTML = '<strong>Reglas activas:</strong> ';
+        div.innerHTML = '<strong>Reglas masivas aplicadas:</strong> ';
         if(reglasMasivas.length === 0) div.innerHTML += 'Ninguna.';
+        
         reglasMasivas.forEach((r, idx) => {
             div.innerHTML += `
-<span class="rule-item">
-                    "${r.texto}" = <b>${r.cadenaPorcentajes}%</b>
-<button class="btn-danger" onclick="eliminarRegla(${idx})">x</button>
-</span>`;
+                <span class="rule-item">
+                    "${r.texto}" = <b>+${r.porcentaje}%</b>
+                    <button class="btn-danger" onclick="eliminarReglaMasiva(${idx})">x</button>
+                </span>`;
         });
     }
- 
-    function eliminarRegla(idx) {
+
+    function eliminarReglaMasiva(idx) {
         reglasMasivas.splice(idx, 1);
-        datosOriginales.forEach(fila => fila.cadenaDesc = '');
+        // Reseteamos y volvemos a aplicar las reglas que quedaron
+        datosOriginales.forEach(fila => fila.descuentosArr = []);
         reglasMasivas.forEach(r => {
             datosOriginales.forEach(fila => {
                 if(String(fila.material).toUpperCase().includes(r.texto)) {
-                    fila.cadenaDesc = r.cadenaPorcentajes;
+                    fila.descuentosArr.push(r.porcentaje);
                 }
             });
         });
         actualizarInterfazReglas();
         renderizarTabla();
     }
- 
+
     function exportarExcel() {
         if(datosOriginales.length === 0) return;
- 
+
         let totalNCGeneral = 0;
- 
+
         const filasExportar = datosOriginales.map(fila => {
-            let calculo = calcularNetoConDescuentosSucesivos(fila.valorNeto, fila.cadenaDesc);
+            let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosArr);
             totalNCGeneral += calculo.montoNC;
- 
+
+            // Unimos los descuentos con un signo '+' para el reporte final en Excel
+            let stringDescuentos = fila.descuentosArr.map(d => d + '%').join(' + ');
+
             return {
                 'FC Interna': fila.fcInterna,
                 'FC AFIP': fila.fcAfip,
@@ -457,25 +544,25 @@
                 'Pedido': fila.pedido,
                 'Remito': fila.remito,
                 'Valor Neto Original': fila.valorNeto,
-                '% Descuento Aplicado': fila.cadenaDesc,
+                'Descuentos Sucesivos': stringDescuentos || '0%',
                 'NC a emitir': calculo.montoNC,
                 'Valor Neto Corregido': calculo.netoCorregido
             };
         });
- 
+
         filasExportar.push({});
         filasExportar.push({
             'Descripción Material': 'TOTAL NC A EMITIR:',
             'NC a emitir': totalNCGeneral
         });
- 
+
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(filasExportar);
         XLSX.utils.book_append_sheet(wb, ws, "Notas de Crédito");
+        
         XLSX.writeFile(wb, "SAP_Reporte_Notas_De_Credito.xlsx");
     }
 </script>
- 
+
 </body>
 </html>
-
