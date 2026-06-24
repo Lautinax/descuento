@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Procesador de Descuentos SAP</title>
+    <title>Procesador de Descuentos SAP - Sucesivos</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body {
@@ -40,7 +40,6 @@
         }
         .drop-zone:hover { background: #e2eefa; }
         
-        /* Contenedor centralizado y compacto de reglas */
         .section-reglas {
             background: #ffffff;
             border: 1px solid #dee2e6;
@@ -82,7 +81,7 @@
             outline: none;
         }
         .input-material { width: 180px; }
-        .input-porcentaje { width: 60px; text-align: center; }
+        .input-porcentaje { width: 110px; text-align: center; }
 
         .section-tabla {
             margin-top: 10px;
@@ -92,7 +91,6 @@
             padding: 12px;
         }
         
-        /* Botones */
         .btn {
             background-color: #0056b3;
             color: white;
@@ -109,7 +107,6 @@
         .btn-danger { background-color: #dc3545; padding: 2px 5px; font-size: 10px; border-radius: 3px; margin-left: 5px;}
         .btn-danger:hover { background-color: #bd2130; }
         
-        /* Tabla ultra compacta */
         .tabla-contenedor {
             overflow-x: auto; 
             max-height: 400px; 
@@ -137,7 +134,7 @@
         tr:hover { background-color: #f8f9fa; }
         
         .input-table-desc { 
-            width: 40px; 
+            width: 80px; 
             padding: 2px; 
             border: 1px solid #ced4da; 
             border-radius: 3px; 
@@ -155,7 +152,6 @@
         }
         .txt-nc { color: #dc3545; font-weight: bold; }
         
-        /* CUADRO DE RESUMEN DESTACADO ABAJO DE TODO */
         .cuadro-resumen-final {
             display: flex;
             justify-content: flex-end;
@@ -190,7 +186,7 @@
 <body>
 
 <div class="container">
-    <h2>Procesador de Descuentos SAP</h2>
+    <h2>Procesador de Descuentos SAP (Encadenados)</h2>
     
     <div id="dropZone" class="drop-zone">
         Arrastrá acá tu archivo Excel exportado de SAP o hacé clic para seleccionar.
@@ -206,8 +202,8 @@
                 <input type="text" id="reglaTexto" class="input-mejorado input-material" placeholder="PANDORA, CRONOS...">
             </div>
             <div class="form-group">
-                <label>Descuento (%):</label>
-                <input type="number" id="reglaPorcentaje" class="input-mejorado input-porcentaje" placeholder="Ej: 10" min="0" max="100" step="0.5">
+                <label>Descuento (Ej: 25+5+3):</label>
+                <input type="text" id="reglaPorcentaje" class="input-mejorado input-porcentaje" placeholder="25+5+3">
             </div>
             <button class="btn" onclick="agregarReglaMasiva()">Aplicar Regla</button>
         </div>
@@ -233,7 +229,7 @@
                         <th>Pedido</th>
                         <th>Remito</th>
                         <th>Valor Neto SAP</th>
-                        <th>% Desc</th>
+                        <th>% Desc (Ej: 25+5)</th>
                         <th>NC a emitir</th>
                         <th>Neto Corregido</th>
                     </tr>
@@ -295,6 +291,29 @@
         return isNaN(num) ? 0 : num;
     }
 
+    // NUEVA FUNCIÓN: Calcula el valor neto final aplicando descuentos sucesivos en cascada
+    function calcularNetoConDescuentosSucesivos(valorNetoInicial, cadenaDescuentos) {
+        if (!cadenaDescuentos) return { netoCorregido: valorNetoInicial, montoNC: 0 };
+        
+        // Limpiamos y separamos por '+' o espacios
+        let descuentos = cadenaDescuentos.toString().replace(/[^0-9. +]/g, '').split(/[ +]+/);
+        
+        let valorActual = valorNetoInicial;
+        
+        descuentos.forEach(d => {
+            let pct = parseFloat(d);
+            if (!isNaN(pct) && pct > 0) {
+                if (pct > 100) pct = 100;
+                valorActual = valorActual * (1 - (pct / 100));
+            }
+        });
+
+        let netoCorregido = valorActual;
+        let montoNC = valorNetoInicial - netoCorregido;
+
+        return { netoCorregido, montoNC };
+    }
+
     function procesarArchivo(file) {
         document.getElementById('fileInfo').innerText = "Último archivo: " + file.name;
         const reader = new FileReader();
@@ -325,7 +344,7 @@
                     pedido: buscarPropiedad(fila, 'Pedido') || '',
                     remito: buscarPropiedad(fila, 'Remito') || '',
                     valorNeto: valorNeto,
-                    porcentajeDesc: 0
+                    cadenaDesc: '' // Guardamos el texto de los descuentos como "25+5+3"
                 };
             });
 
@@ -345,11 +364,8 @@
         let sumaTotalNC = 0;
 
         datosOriginales.forEach((fila, index) => {
-            let descPorcentaje = fila.porcentajeDesc || 0;
-            let montoNC = fila.valorNeto * (descPorcentaje / 100);
-            let valorCorregido = fila.valorNeto - montoNC;
-
-            sumaTotalNC += montoNC;
+            let calculo = calcularNetoConDescuentosSucesivos(fila.valorNeto, fila.cadenaDesc);
+            sumaTotalNC += calculo.montoNC;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
@@ -363,42 +379,37 @@
                 <td>${fila.remito}</td>
                 <td>$${fila.valorNeto.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                 <td>
-                    <input type="number" class="input-table-desc" min="0" max="100" step="0.5" 
-                           value="${descPorcentaje}" onchange="actualizarDescuentoFila(${index}, this.value)">%
+                    <input type="text" class="input-table-desc" 
+                           value="${fila.cadenaDesc}" placeholder="0" onchange="actualizarDescuentoFila(${index}, this.value)">
                 </td>
-                <td class="txt-nc">$${montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td><strong>$${valorCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                <td class="txt-nc">$${calculo.montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td><strong>$${calculo.netoCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
             `;
             tbody.appendChild(tr);
         });
 
-        // Actualiza el cuadro destacado con el total de la NC
         document.getElementById('totalNcCuadro').innerText = "$" + sumaTotalNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
     function actualizarDescuentoFila(index, valor) {
-        let pct = parseFloat(valor) || 0;
-        if(pct < 0) pct = 0;
-        if(pct > 100) pct = 100;
-        
-        datosOriginales[index].porcentajeDesc = pct;
+        datosOriginales[index].cadenaDesc = valor.trim();
         renderizarTabla();
     }
 
     function agregarReglaMasiva() {
         const texto = document.getElementById('reglaTexto').value.trim().toUpperCase();
-        const porcentaje = parseFloat(document.getElementById('reglaPorcentaje').value);
+        const cadenaPorcentajes = document.getElementById('reglaPorcentaje').value.trim();
 
-        if(!texto || isNaN(porcentaje)) {
-            alert("Por favor completá el término de búsqueda y el porcentaje.");
+        if(!texto || !cadenaPorcentajes) {
+            alert("Por favor completá el término de búsqueda y la cadena de descuento (Ej: 25+5).");
             return;
         }
 
-        reglasMasivas.push({ texto, porcentaje });
+        reglasMasivas.push({ texto, cadenaPorcentajes });
 
         datosOriginales.forEach(fila => {
             if(String(fila.material).toUpperCase().includes(texto)) {
-                fila.porcentajeDesc = porcentaje;
+                fila.cadenaDesc = cadenaPorcentajes;
             }
         });
 
@@ -416,7 +427,7 @@
         reglasMasivas.forEach((r, idx) => {
             div.innerHTML += `
                 <span class="rule-item">
-                    "${r.texto}" = <b>${r.porcentaje}%</b>
+                    "${r.texto}" = <b>${r.cadenaPorcentajes}%</b>
                     <button class="btn-danger" onclick="eliminarRegla(${idx})">x</button>
                 </span>`;
         });
@@ -424,11 +435,11 @@
 
     function eliminarRegla(idx) {
         reglasMasivas.splice(idx, 1);
-        datosOriginales.forEach(fila => fila.porcentajeDesc = 0);
+        datosOriginales.forEach(fila => fila.cadenaDesc = '');
         reglasMasivas.forEach(r => {
             datosOriginales.forEach(fila => {
                 if(String(fila.material).toUpperCase().includes(r.texto)) {
-                    fila.porcentajeDesc = r.porcentaje;
+                    fila.cadenaDesc = r.cadenaPorcentajes;
                 }
             });
         });
@@ -442,10 +453,8 @@
         let totalNCGeneral = 0;
 
         const filasExportar = datosOriginales.map(fila => {
-            let descPorcentaje = fila.porcentajeDesc || 0;
-            let montoNC = fila.valorNeto * (descPorcentaje / 100);
-            let valorCorregido = fila.valorNeto - montoNC;
-            totalNCGeneral += montoNC;
+            let calculo = calcularNetoConDescuentosSucesivos(fila.valorNeto, fila.cadenaDesc);
+            totalNCGeneral += calculo.montoNC;
 
             return {
                 'FC Interna': fila.fcInterna,
@@ -457,9 +466,9 @@
                 'Pedido': fila.pedido,
                 'Remito': fila.remito,
                 'Valor Neto Original': fila.valorNeto,
-                '% Descuento': descPorcentaje + '%',
-                'NC a emitir': montoNC,
-                'Valor Neto Corregido': valorCorregido
+                '% Descuento Aplicado': fila.cadenaDesc,
+                'NC a emitir': calculo.montoNC,
+                'Valor Neto Corregido': calculo.netoCorregido
             };
         });
 
