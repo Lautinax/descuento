@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Descuentos SAP</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f4f6f9;
+            color: #333;
+        }
+        h2 { color: #0056b3; }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 1200px;
+            margin: auto;
+        }
+        .drop-zone {
+            border: 2px dashed #0056b3;
+            padding: 30px;
+            text-align: center;
+            background: #eef5fc;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .drop-zone:hover { background: #e0eefe; }
+        .section {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn:hover { background-color: #0056b3; }
+        .btn-success { background-color: #28a745; }
+        .btn-success:hover { background-color: #218838; }
+        .btn-danger { background-color: #dc3545; padding: 4px 8px; font-size: 12px;}
+        .btn-danger:hover { background-color: #c82333; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th { background-color: #f2f2f2; position: sticky; top: 0; }
+        input[type="number"], input[type="text"] {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .input-table-desc { width: 60px; }
+        .rule-item {
+            display: inline-block;
+            background: #e2e3e5;
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Procesador de Descuentos SAP</h2>
+    
+    <div id="dropZone" class="drop-zone">
+        Arrastrá acá tu archivo Excel exportado de SAP o hacé clic para seleccionar.
+        <input type="file" id="fileInput" accept=".xlsx, .xls" style="display:none">
+    </div>
+    <div id="fileInfo" style="font-weight: bold; color: green; margin-bottom: 10px;"></div>
+
+    <div class="section" id="secReglas" style="display:none;">
+        <h3>➕ Aplicar Regla Masiva por Texto (Ej: CRONOS = 5%)</h3>
+        <input type="text" id="reglaTexto" placeholder="Buscar texto (Ej: CRONOS)">
+        <input type="number" id="reglaPorcentaje" placeholder="Descuento %" min="0" max="100">
+        <button class="btn" onclick="agregarReglaMasiva()">Aplicar Regla</button>
+        <div id="listaReglas" style="margin-top: 10px;"></div>
+    </div>
+
+    <div class="section" id="secResultado" style="display:none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>📋 Vista Previa y Edición Individual</h3>
+            <button class="btn btn-success" onclick="exportarExcel()">📥 Exportar Excel Corregido</button>
+        </div>
+        <div style="overflow-x:auto; max-height: 500px;">
+            <table id="tablaDatos">
+                <thead>
+                    <tr>
+                        <th>FC Interna</th>
+                        <th>FC AFIP</th>
+                        <th>Número de material</th>
+                        <th>Material</th>
+                        <th>Ctd. facturada</th>
+                        <th>Entrega</th>
+                        <th>Pedido</th>
+                        <th>Remito</th>
+                        <th>Valor Neto</th>
+                        <th>% Desc</th>
+                        <th>Valor Corregido</th>
+                        <th>Diferencia</th>
+                    </tr>
+                </thead>
+                <tbody id="cuerpoTabla"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Variables globales para guardar los datos procesados y las reglas
+    let datosOriginales = [];
+    let reglasMasivas = [];
+
+    // Mapeo estricto basado en las columnas de tu Excel de SAP
+    const mapaColumnas = {
+        'FC Interna': 'FC Interna',
+        'FC AFIP': 'FC AFIP',
+        'Número de material': 'Número de material',
+        'Material': 'Material',
+        'Ctd. facturada': 'Ctd.facturada',
+        'Entrega': 'Entrega',
+        'Pedido': 'Pedido',
+        'Remito': 'Remito',
+        'Valor Neto': 'Valor neto'
+    };
+
+    // Configuración de eventos para arrastrar y soltar
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = '#e0eefe'; });
+    dropZone.addEventListener('dragleave', () => dropZone.style.background = '#eef5fc');
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.background = '#eef5fc';
+        if (e.dataTransfer.files.length > 0) {
+            procesarArchivo(e.dataTransfer.files[0]);
+        }
+    });
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) procesarArchivo(e.target.files[0]);
+    });
+
+    // Función para leer el archivo Excel
+    function procesarArchivo(file) {
+        document.getElementById('fileInfo').innerText = "Cargando archivo: " + file.name;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Convertimos la hoja a un array de objetos JSON
+            const json = XLSX.utils.sheet_to_json(worksheet);
+            
+            if(json.length === 0) {
+                alert("El archivo está vacío.");
+                return;
+            }
+
+            // Normalizamos y filtramos las columnas que requerís
+            datosOriginales = json.map(fila => {
+                // Limpieza de valores numéricos de SAP
+                let valorNeto = fila[mapaColumnas['Valor Neto']] ? parseFloat(String(fila[mapaColumnas['Valor Neto']]).replace(/[^0-9.-]/g, '')) : 0;
+                let ctdFacturada = fila[mapaColumnas['Ctd. facturada']] ? parseInt(fila[mapaColumnas['Ctd. facturada']]) : 0;
+
+                return {
+                    fcInterna: fila[mapaColumnas['FC Interna']] || '',
+                    fcAfip: fila[mapaColumnas['FC AFIP']] || '',
+                    numMaterial: fila[mapaColumnas['Número de material']] || '',
+                    material: fila[mapaColumnas['Material']] || '',
+                    cantidad: ctdFacturada,
+                    entrega: fila[mapaColumnas['Entrega']] || '',
+                    pedido: fila[mapaColumnas['Pedido']] || '',
+                    remito: fila[mapaColumnas['Remito']] || '',
+                    valorNeto: valorNeto,
+                    porcentajeDesc: 0 // Inicia en cero
+                };
+            });
+
+            // Mostrar secciones de la app
+            document.getElementById('secReglas').style.display = 'block';
+            document.getElementById('secResultado').style.display = 'block';
+            reglasMasivas = [];
+            actualizarInterfazReglas();
+            renderizarTabla();
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // Renderizar la tabla dinámica en pantalla
+    function renderizarTabla() {
+        const tbody = document.getElementById('cuerpoTabla');
+        tbody.innerHTML = '';
+
+        datosOriginales.forEach((fila, index) => {
+            // Calcular valores corregidos en tiempo real
+            let descPorcentaje = fila.porcentajeDesc || 0;
+            let valorCorregido = fila.valorNeto * (1 - (descPorcentaje / 100));
+            let diferencia = fila.valorNeto - valorCorregido;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${fila.fcInterna}</td>
+                <td>${fila.fcAfip}</td>
+                <td>${fila.numMaterial}</td>
+                <td><strong>${fila.material}</strong></td>
+                <td>${fila.cantidad}</td>
+                <td>${fila.entrega}</td>
+                <td>${fila.pedido}</td>
+                <td>${fila.remito}</td>
+                <td>$${fila.valorNeto.toFixed(2)}</td>
+                <td>
+                    <input type="number" class="input-table-desc" min="0" max="100" step="0.5" 
+                           value="${descPorcentaje}" onchange="actualizarDescuentoFila(${index}, this.value)">%
+                </td>
+                <td><strong>$${valorCorregido.toFixed(2)}</strong></td>
+                <td style="color: red;">-$${diferencia.toFixed(2)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Modificar descuento fila por fila (el botón manual e individual)
+    function actualizarDescuentoFila(index, valor) {
+        let pct = parseFloat(valor) || 0;
+        if(pct < 0) pct = 0;
+        if(pct > 100) pct = 100;
+        datosOriginales[index].porcentajeDesc = pct;
+        renderizarTabla();
+    }
+
+    // Agregar reglas masivas (Ej: Todo lo que contenga CRONOS tiene un 5%)
+    function agregarReglaMasiva() {
+        const texto = document.getElementById('reglaTexto').value.trim().toUpperCase();
+        const porcentaje = parseFloat(document.getElementById('reglaPorcentaje').value);
+
+        if(!texto || isNaN(porcentaje)) {
+            alert("Por favor completá el término de búsqueda y el porcentaje.");
+            return;
+        }
+
+        reglasMasivas.push({ texto, porcentaje });
+        
+        // Aplicar la regla a toda la lista actual que coincida
+        datosOriginales.forEach(fila => {
+            if(fila.material.toUpperCase().includes(texto)) {
+                fila.porcentajeDesc = porcentaje;
+            }
+        });
+
+        // Limpiar inputs, actualizar la lista visual y redibujar la tabla
+        document.getElementById('reglaTexto').value = '';
+        document.getElementById('reglaPorcentaje').value = '';
+        actualizarInterfazReglas();
+        renderizarTabla();
+    }
+
+    function actualizarInterfazReglas() {
+        const div = document.getElementById('listaReglas');
+        div.innerHTML = '<strong>Reglas activas actuales:</strong><br>';
+        if(reglasMasivas.length === 0) div.innerHTML += ' Ninguna.';
+        
+        reglasMasivas.forEach((r, idx) => {
+            div.innerHTML += `
+                <span class="rule-item">
+                    "${r.texto}" ➡️ <b>${r.porcentaje}%</b>
+                    <button class="btn-danger" onclick="eliminarRegla(${idx})">x</button>
+                </span>`;
+        });
+    }
+
+    function eliminarRegla(idx) {
+        reglasMasivas.splice(idx, 1);
+        // Reseteamos y volvemos a aplicar las reglas restantes
+        datosOriginales.forEach(fila => fila.porcentajeDesc = 0);
+        reglasMasivas.forEach(r => {
+            datosOriginales.forEach(fila => {
+                if(fila.material.toUpperCase().includes(r.texto)) {
+                    fila.porcentajeDesc = r.porcentaje;
+                }
+            });
+        });
+        actualizarInterfazReglas();
+        renderizarTabla();
+    }
+
+    // Exportar a Excel con las columnas formateadas de manera HORIZONTAL
+    function exportarExcel() {
+        if(datosOriginales.length === 0) return;
+
+        let totalDescuentoGeneral = 0;
+
+        // Generar las nuevas filas horizontales estructuradas
+        const filasExportar = datosOriginales.map(fila => {
+            let descPorcentaje = fila.porcentajeDesc || 0;
+            let valorCorregido = fila.valorNeto * (1 - (descPorcentaje / 100));
+            let diferencia = fila.valorNeto - valorCorregido;
+            totalDescuentoGeneral += diferencia;
+
+            return {
+                'FC Interna': fila.fcInterna,
+                'FC AFIP': fila.fcAfip,
+                'Número de material': fila.numMaterial,
+                'Material': fila.material,
+                'Ctd. facturada': fila.cantidad,
+                'Entrega': fila.entrega,
+                'Pedido': fila.pedido,
+                'Remito': fila.remito,
+                'Valor Neto Original': fila.valorNeto,
+                '% Descuento': descPorcentaje + '%',
+                'Valor Corregido': valorCorregido,
+                'Diferencia (Descuento)': diferencia
+            };
+        });
+
+        // Agregamos una fila vacía y el total al final de la planilla
+        filasExportar.push({});
+        filasExportar.push({
+            'Material': 'TOTAL DESCUENTO OTORGADO:',
+            'Diferencia (Descuento)': totalDescuentoGeneral
+        });
+
+        // Crear el archivo Excel usando SheetJS
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(filasExportar);
+        XLSX.utils.book_append_sheet(wb, ws, "Descuentos Aplicados");
+        
+        // Descargar el archivo procesado automáticamente
+        XLSX.writeFile(wb, "SAP_Facturacion_Con_Descuentos.xlsx");
+    }
+</script>
+
+</body>
+</html>
