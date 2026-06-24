@@ -130,16 +130,15 @@
 </div>
 
 <script>
-    // Variables globales para guardar los datos procesados y las reglas
     let datosOriginales = [];
     let reglasMasivas = [];
 
-    // Mapeo estricto basado en las columnas de tu Excel de SAP
+    // Ajustamos el mapeo invirtiendo los nombres para que coincidan con la realidad de SAP
     const mapaColumnas = {
         'FC Interna': 'FC Interna',
         'FC AFIP': 'FC AFIP',
-        'Número de material': 'Número de material',
-        'Material': 'Material',
+        'Número de material': 'Material',            // En SAP, "Material" es el código numérico
+        'Material': 'Número de material',          // En SAP, "Número de material" es la descripción (CRONOS, etc)
         'Ctd. facturada': 'Ctd.facturada',
         'Entrega': 'Entrega',
         'Pedido': 'Pedido',
@@ -147,7 +146,6 @@
         'Valor Neto': 'Valor neto'
     };
 
-    // Configuración de eventos para arrastrar y soltar
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
 
@@ -165,7 +163,6 @@
         if (e.target.files.length > 0) procesarArchivo(e.target.files[0]);
     });
 
-    // Función para leer el archivo Excel
     function procesarArchivo(file) {
         document.getElementById('fileInfo').innerText = "Cargando archivo: " + file.name;
         const reader = new FileReader();
@@ -175,7 +172,6 @@
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
             
-            // Convertimos la hoja a un array de objetos JSON
             const json = XLSX.utils.sheet_to_json(worksheet);
             
             if(json.length === 0) {
@@ -183,27 +179,24 @@
                 return;
             }
 
-            // Normalizamos y filtramos las columnas que requerís
             datosOriginales = json.map(fila => {
-                // Limpieza de valores numéricos de SAP
                 let valorNeto = fila[mapaColumnas['Valor Neto']] ? parseFloat(String(fila[mapaColumnas['Valor Neto']]).replace(/[^0-9.-]/g, '')) : 0;
                 let ctdFacturada = fila[mapaColumnas['Ctd. facturada']] ? parseInt(fila[mapaColumnas['Ctd. facturada']]) : 0;
 
                 return {
                     fcInterna: fila[mapaColumnas['FC Interna']] || '',
                     fcAfip: fila[mapaColumnas['FC AFIP']] || '',
-                    numMaterial: fila[mapaColumnas['Número de material']] || '',
-                    material: fila[mapaColumnas['Material']] || '',
+                    numMaterial: fila[mapaColumnas['Número de material']] || '', // Ahora guarda el código numérico
+                    material: fila[mapaColumnas['Material']] || '',             // Ahora guarda la descripción de texto
                     cantidad: ctdFacturada,
                     entrega: fila[mapaColumnas['Entrega']] || '',
                     pedido: fila[mapaColumnas['Pedido']] || '',
                     remito: fila[mapaColumnas['Remito']] || '',
                     valorNeto: valorNeto,
-                    porcentajeDesc: 0 // Inicia en cero
+                    porcentajeDesc: 0
                 };
             });
 
-            // Mostrar secciones de la app
             document.getElementById('secReglas').style.display = 'block';
             document.getElementById('secResultado').style.display = 'block';
             reglasMasivas = [];
@@ -213,13 +206,11 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // Renderizar la tabla dinámica en pantalla
     function renderizarTabla() {
         const tbody = document.getElementById('cuerpoTabla');
         tbody.innerHTML = '';
 
         datosOriginales.forEach((fila, index) => {
-            // Calcular valores corregidos en tiempo real
             let descPorcentaje = fila.porcentajeDesc || 0;
             let valorCorregido = fila.valorNeto * (1 - (descPorcentaje / 100));
             let diferencia = fila.valorNeto - valorCorregido;
@@ -246,7 +237,6 @@
         });
     }
 
-    // Modificar descuento fila por fila (el botón manual e individual)
     function actualizarDescuentoFila(index, valor) {
         let pct = parseFloat(valor) || 0;
         if(pct < 0) pct = 0;
@@ -255,7 +245,6 @@
         renderizarTabla();
     }
 
-    // Agregar reglas masivas (Ej: Todo lo que contenga CRONOS tiene un 5%)
     function agregarReglaMasiva() {
         const texto = document.getElementById('reglaTexto').value.trim().toUpperCase();
         const porcentaje = parseFloat(document.getElementById('reglaPorcentaje').value);
@@ -267,14 +256,12 @@
 
         reglasMasivas.push({ texto, porcentaje });
         
-        // Aplicar la regla a toda la lista actual que coincida
         datosOriginales.forEach(fila => {
             if(fila.material.toUpperCase().includes(texto)) {
                 fila.porcentajeDesc = porcentaje;
             }
         });
 
-        // Limpiar inputs, actualizar la lista visual y redibujar la tabla
         document.getElementById('reglaTexto').value = '';
         document.getElementById('reglaPorcentaje').value = '';
         actualizarInterfazReglas();
@@ -297,7 +284,6 @@
 
     function eliminarRegla(idx) {
         reglasMasivas.splice(idx, 1);
-        // Reseteamos y volvemos a aplicar las reglas restantes
         datosOriginales.forEach(fila => fila.porcentajeDesc = 0);
         reglasMasivas.forEach(r => {
             datosOriginales.forEach(fila => {
@@ -310,13 +296,11 @@
         renderizarTabla();
     }
 
-    // Exportar a Excel con las columnas formateadas de manera HORIZONTAL
     function exportarExcel() {
         if(datosOriginales.length === 0) return;
 
         let totalDescuentoGeneral = 0;
 
-        // Generar las nuevas filas horizontales estructuradas
         const filasExportar = datosOriginales.map(fila => {
             let descPorcentaje = fila.porcentajeDesc || 0;
             let valorCorregido = fila.valorNeto * (1 - (descPorcentaje / 100));
@@ -339,19 +323,16 @@
             };
         });
 
-        // Agregamos una fila vacía y el total al final de la planilla
         filasExportar.push({});
         filasExportar.push({
             'Material': 'TOTAL DESCUENTO OTORGADO:',
             'Diferencia (Descuento)': totalDescuentoGeneral
         });
 
-        // Crear el archivo Excel usando SheetJS
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(filasExportar);
         XLSX.utils.book_append_sheet(wb, ws, "Descuentos Aplicados");
         
-        // Descargar el archivo procesado automáticamente
         XLSX.writeFile(wb, "SAP_Facturacion_Con_Descuentos.xlsx");
     }
 </script>
