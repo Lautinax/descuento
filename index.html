@@ -134,7 +134,7 @@
         tr:hover { background-color: #f8f9fa; }
         
         .input-table-desc { 
-            width: 80px; 
+            width: 85px; 
             padding: 2px; 
             border: 1px solid #ced4da; 
             border-radius: 3px; 
@@ -222,8 +222,8 @@
                     <tr>
                         <th>FC Interna</th>
                         <th>FC AFIP</th>
-                        <th>Número de material</th>
-                        <th>Material</th>
+                        <th>Código Material</th>
+                        <th>Descripción Material</th>
                         <th>Ctd. facturada</th>
                         <th>Entrega</th>
                         <th>Pedido</th>
@@ -291,12 +291,12 @@
         return isNaN(num) ? 0 : num;
     }
 
-    // NUEVA FUNCIÓN: Calcula el valor neto final aplicando descuentos sucesivos en cascada
     function calcularNetoConDescuentosSucesivos(valorNetoInicial, cadenaDescuentos) {
         if (!cadenaDescuentos) return { netoCorregido: valorNetoInicial, montoNC: 0 };
         
-        // Limpiamos y separamos por '+' o espacios
-        let descuentos = cadenaDescuentos.toString().replace(/[^0-9. +]/g, '').split(/[ +]+/);
+        // Permite números con punto o coma, separados por '+' o espacios
+        let normalizada = cadenaDescuentos.toString().replace(/,/g, '.');
+        let descuentos = normalizada.replace(/[^0-9. +]/g, '').split(/[ +]+/);
         
         let valorActual = valorNetoInicial;
         
@@ -334,17 +334,21 @@
                 let valorNeto = limpiarNumeroSAP(buscarPropiedad(fila, 'Valor neto'));
                 let ctdFacturada = parseInt(buscarPropiedad(fila, 'Ctd.facturada')) || parseInt(buscarPropiedad(fila, 'Ctd. facturada')) || 0;
 
+                // Mapeo corregido según la estructura real de tu reporte SAP
+                let codigoMat = buscarPropiedad(fila, 'Material') || '';
+                let descMat = buscarPropiedad(fila, 'Número de material') || '';
+
                 return {
                     fcInterna: buscarPropiedad(fila, 'FC Interna') || '',
                     fcAfip: buscarPropiedad(fila, 'FC AFIP') || '',
-                    numMaterial: buscarPropiedad(fila, 'Material') || '',
-                    material: buscarPropiedad(fila, 'Número de material') || '',
+                    numMaterial: codigoMat,
+                    material: descMat,
                     cantidad: ctdFacturada,
                     entrega: buscarPropiedad(fila, 'Entrega') || '',
                     pedido: buscarPropiedad(fila, 'Pedido') || '',
                     remito: buscarPropiedad(fila, 'Remito') || '',
                     valorNeto: valorNeto,
-                    cadenaDesc: '' // Guardamos el texto de los descuentos como "25+5+3"
+                    cadenaDesc: ''
                 };
             });
 
@@ -459,8 +463,8 @@
             return {
                 'FC Interna': fila.fcInterna,
                 'FC AFIP': fila.fcAfip,
-                'Número de material': fila.numMaterial,
-                'Material': fila.material,
+                'Código Material': fila.numMaterial,
+                'Descripción Material': fila.material,
                 'Ctd. facturada': fila.cantidad,
                 'Entrega': fila.entrega,
                 'Pedido': fila.pedido,
@@ -474,7 +478,7 @@
 
         filasExportar.push({});
         filasExportar.push({
-            'Material': 'TOTAL NC A EMITIR:',
+            'Descripción Material': 'TOTAL NC A EMITIR:',
             'NC a emitir': totalNCGeneral
         });
 
