@@ -134,7 +134,7 @@
         }
         tr:hover { background-color: #f8f9fa; }
         
-        /* Contenedor horizontal estable de los descuentos */
+        /* Contenedor horizontal estable */
         .celda-descuentos-wrapper {
             display: flex;
             align-items: center;
@@ -245,7 +245,7 @@
         <h3>➕ Agregar regla de descuento masivo</h3>
         <div class="form-regla">
             <div class="form-group">
-                <label>Buscar texto en Material:</label>
+                <label>Buscar en Descripción Material:</label>
                 <input type="text" id="reglaTexto" class="input-mejorado input-material" placeholder="PANDORA, CRONOS...">
             </div>
             <div class="form-group">
@@ -316,16 +316,6 @@
         if (e.target.files.length > 0) procesarArchivo(e.target.files[0]);
     });
 
-    function buscarPropiedad(objeto, nombreDeseado) {
-        const nombreLimpio = nombreDeseado.toLowerCase().replace(/\s+/g, '');
-        for (let clave in objeto) {
-            if (clave.toLowerCase().replace(/\s+/g, '') === nombreLimpio) {
-                return objeto[clave];
-            }
-        }
-        return undefined;
-    }
-
     function limpiarNumeroSAP(valor) {
         if (valor === undefined || valor === null || valor === '') return 0;
         let str = String(valor).trim();
@@ -366,22 +356,23 @@
                 return;
             }
 
-            datosOriginales = json.map(fila => {
-                let valorNeto = limpiarNumeroSAP(buscarPropiedad(fila, 'Valor neto'));
-                let ctdFacturada = parseInt(buscarPropiedad(fila, 'Ctd.facturada')) || parseInt(buscarPropiedad(fila, 'Ctd. facturada')) || 0;
+            // Debug en consola F12
+            console.log("Primer objeto detectado por SheetJS:", json[0]);
 
-                let codigoMat = buscarPropiedad(fila, 'Material') || '';
-                let descMat = buscarPropiedad(fila, 'Número de material') || '';
+            // Mapeo corregido según los encabezados reales detectados
+            datosOriginales = json.map(fila => {
+                const valorNeto = limpiarNumeroSAP(fila["Valor neto"]);
+                const ctdFacturada = Number(String(fila["Ctd.facturada"] || 0).replace(",", "."));
 
                 return {
-                    fcInterna: buscarPropiedad(fila, 'FC Interna') || '',
-                    fcAfip: buscarPropiedad(fila, 'FC AFIP') || '',
-                    numMaterial: codigoMat,
-                    material: descMat,
-                    cantidad: ctdFacturada,
-                    entrega: buscarPropiedad(fila, 'Entrega') || '',
-                    pedido: buscarPropiedad(fila, 'Pedido') || '',
-                    remito: buscarPropiedad(fila, 'Remito') || '',
+                    fcInterna: fila["FC Interna"] || "",
+                    fcAfip: fila["FC AFIP"] || "",
+                    numMaterial: fila["Material"] || "",
+                    material: fila["Número de material"] || "",
+                    cantidad: isNaN(ctdFacturada) ? 0 : ctdFacturada,
+                    entrega: fila["Entrega"] || "",
+                    pedido: fila["Pedido"] || "",
+                    remito: fila["Remito"] || "",
                     valorNeto: valorNeto,
                     descuentosArr: [] 
                 };
@@ -409,7 +400,6 @@
             const tr = document.createElement('tr');
             tr.id = `fila_${index}`;
 
-            // Contenedor de chips horizontales
             let chipsHTML = `<div class="lista-chips-horizontal" id="chips_container_${index}">`;
             fila.descuentosArr.forEach((desc, dIdx) => {
                 chipsHTML += `
@@ -447,12 +437,10 @@
         document.getElementById('totalNcCuadro').innerText = "$" + sumaTotalNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
-    // Actualiza valores específicos de la fila sin romper los focos del teclado
     function actualizarValoresFilaDinamico(index) {
         let fila = datosOriginales[index];
         let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosArr);
 
-        // Actualizar contenedor de chips
         let container = document.getElementById(`chips_container_${index}`);
         let chipsHTML = "";
         fila.descuentosArr.forEach((desc, dIdx) => {
@@ -464,11 +452,9 @@
         });
         container.innerHTML = chipsHTML;
 
-        // Actualizar totales de la fila
         document.getElementById(`monto_nc_${index}`).innerText = "$" + calculo.montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById(`neto_corregido_${index}`).innerHTML = "<strong>$" + calculo.netoCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + "</strong>";
 
-        // Recalcular el cuadro grande general de abajo
         let sumaTotalNC = 0;
         datosOriginales.forEach(f => {
             let c = calcularNetoConListaDescuentos(f.valorNeto, f.descuentosArr);
@@ -485,7 +471,7 @@
         if (!isNaN(valor) && valor > 0) {
             if (valor > 100) valor = 100;
             datosOriginales[index].descuentosArr.push(valor);
-            input.value = ''; // Vacía el cuadrito al toque
+            input.value = ''; 
             actualizarValoresFilaDinamico(index);
             input.focus();
         } else {
