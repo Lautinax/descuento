@@ -28,7 +28,7 @@
         }
         .drop-zone {
             border: 1.5px dashed #0056b3;
-            padding: 12px;
+            padding: 20px;
             text-align: center;
             background: #f0f6fc;
             cursor: pointer;
@@ -37,8 +37,15 @@
             font-size: 13px;
             font-weight: 500;
             color: #0056b3;
+            transition: all 0.2s ease;
         }
-        .drop-zone:hover { background: #e2eefa; }
+        .drop-zone.loading {
+            background: #e2eefa;
+            border-color: #6c757d;
+            color: #495057;
+            cursor: wait;
+        }
+        .drop-zone:hover:not(.loading) { background: #e2eefa; }
         
         .section-reglas {
             background: #ffffff;
@@ -134,7 +141,6 @@
         }
         tr:hover { background-color: #f8f9fa; }
         
-        /* Contenedor horizontal estable */
         .celda-descuentos-wrapper {
             display: flex;
             align-items: center;
@@ -144,6 +150,7 @@
             display: flex;
             gap: 4px;
             align-items: center;
+            flex-wrap: wrap;
         }
         .chip-desc {
             display: inline-flex;
@@ -155,6 +162,11 @@
             font-size: 11px;
             font-weight: 600;
             color: #495057;
+        }
+        .chip-desc.masivo {
+            background: #e2eefa;
+            border-color: #b8daff;
+            color: #004085;
         }
         .chip-desc .btn-borrar-chip {
             color: #dc3545;
@@ -202,41 +214,77 @@
         .cuadro-resumen-final {
             display: flex;
             justify-content: flex-end;
+            gap: 15px;
             margin-top: 15px;
             padding-top: 10px;
             border-top: 1px solid #dee2e6;
         }
-        .tarjeta-total {
+        .tarjeta-resumen {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 10px 20px;
+            text-align: right;
+            min-width: 150px;
+        }
+        .tarjeta-resumen label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #6c757d;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .tarjeta-resumen .monto {
+            font-size: 16px;
+            font-weight: 700;
+            color: #495057;
+        }
+        .tarjeta-resumen.total-nc {
             background-color: #fff5f5;
             border: 2px solid #feb2b2;
-            border-radius: 6px;
-            padding: 12px 25px;
-            text-align: right;
-            box-shadow: 0 2px 4px rgba(220, 53, 69, 0.05);
         }
-        .tarjeta-total label {
-            font-size: 12px;
-            font-weight: bold;
-            color: #c53030;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            display: block;
-            margin-bottom: 4px;
+        .tarjeta-resumen.total-nc label { color: #c53030; }
+        .tarjeta-resumen.total-nc .monto { font-size: 20px; color: #e53e3e; font-weight: 800; }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
         }
-        .tarjeta-total .monto {
-            font-size: 22px;
-            font-weight: 800;
-            color: #e53e3e;
+        .toast {
+            background: #333;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            opacity: 0;
+            transform: translateY(-20px);
+            animation: fadeIn 0.3s forwards, fadeOut 0.3s 2.7s forwards;
         }
+        .toast.success { background: #28a745; }
+        .toast.error { background: #dc3545; }
+        @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-20px); } }
     </style>
 </head>
 <body>
 
+<div class="toast-container" id="toastContainer"></div>
+
 <div class="container">
-    <h2>Procesador de Descuentos SAP (Chips Horizontales)</h2>
+    <h2>Procesador de Descuentos SAP (Versión Pro)</h2>
     
     <div id="dropZone" class="drop-zone">
-        Arrastrá acá tu archivo Excel exportado de SAP o hacé clic para seleccionar.
+        <span id="dropZoneText">Arrastrá acá tu archivo Excel exportado de SAP o hacé clic para seleccionar.</span>
         <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display:none">
     </div>
     <div id="fileInfo" style="font-size: 11px; font-weight: bold; color: #28a745; margin-bottom: 8px;"></div>
@@ -245,8 +293,8 @@
         <h3>➕ Agregar regla de descuento masivo</h3>
         <div class="form-regla">
             <div class="form-group">
-                <label>Buscar en Descripción Material:</label>
-                <input type="text" id="reglaTexto" class="input-mejorado input-material" placeholder="PANDORA, CRONOS...">
+                <label>Buscar en Descripción o Código:</label>
+                <input type="text" id="reglaTexto" class="input-mejorado input-material" placeholder="PANDORA, CRONOS, 1000...">
             </div>
             <div class="form-group">
                 <label>Descuento (%):</label>
@@ -276,7 +324,7 @@
                         <th>Pedido</th>
                         <th>Remito</th>
                         <th>Valor Neto SAP</th>
-                        <th style="min-width: 220px;">% Descuentos Acumulados</th>
+                        <th style="min-width: 240px;">% Descuentos Acumulados</th>
                         <th>NC a emitir</th>
                         <th>Neto Corregido</th>
                     </tr>
@@ -286,9 +334,17 @@
         </div>
 
         <div class="cuadro-resumen-final">
-            <div class="tarjeta-total">
+            <div class="tarjeta-resumen">
+                <label>Total Original SAP</label>
+                <div id="totalOriginalCuadro" class="monto">$0,00</div>
+            </div>
+            <div class="tarjeta-resumen total-nc">
                 <label>Total de NC a realizar</label>
                 <div id="totalNcCuadro" class="monto">$0,00</div>
+            </div>
+            <div class="tarjeta-resumen">
+                <label>Total Neto Corregido</label>
+                <div id="totalNetoCorregidoCuadro" class="monto">$0,00</div>
             </div>
         </div>
 
@@ -300,15 +356,38 @@
     let reglasMasivas = [];
 
     const dropZone = document.getElementById('dropZone');
+    const dropZoneText = document.getElementById('dropZoneText');
     const fileInput = document.getElementById('fileInput');
 
-    dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = '#e2eefa'; });
+    // Alerta de salida involuntaria si hay datos cargados
+    window.addEventListener('beforeunload', (e) => {
+        if (datosOriginales.length > 0) {
+            e.preventDefault();
+            e.returnValue = '¿Estás seguro de que querés salir? Perderás los cambios no guardados.';
+        }
+    });
+
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `<span>${message}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    dropZone.addEventListener('click', () => {
+        if(!dropZone.classList.contains('loading')) fileInput.click();
+    });
+    dropZone.addEventListener('dragover', (e) => { 
+        e.preventDefault(); 
+        if(!dropZone.classList.contains('loading')) dropZone.style.background = '#e2eefa'; 
+    });
     dropZone.addEventListener('dragleave', () => dropZone.style.background = '#f0f6fc');
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.style.background = '#f0f6fc';
-        if (e.dataTransfer.files.length > 0) {
+        if (e.dataTransfer.files.length > 0 && !dropZone.classList.contains('loading')) {
             procesarArchivo(e.dataTransfer.files[0]);
         }
     });
@@ -328,9 +407,11 @@
         return isNaN(num) ? 0 : num;
     }
 
-    function calcularNetoConListaDescuentos(valorNetoInicial, listaDescuentos) {
+    function calcularNetoConListaDescuentos(valorNetoInicial, descuentosManuales, descuentosMasivos) {
         let valorActual = valorNetoInicial;
-        listaDescuentos.forEach(pct => {
+        // Se aplican secuencialmente todos los descuentos (primero manuales, luego masivos)
+        const listaCompleta = [...descuentosManuales, ...descuentosMasivos];
+        listaCompleta.forEach(pct => {
             if (pct > 0) {
                 valorActual = valorActual * (1 - (pct / 100));
             }
@@ -341,73 +422,103 @@
     }
 
     function procesarArchivo(file) {
-        document.getElementById('fileInfo').innerText = "Último archivo: " + file.name;
+        // Activar estado de carga
+        dropZone.classList.add('loading');
+        dropZoneText.innerText = "⏳ Procesando archivo de SAP de forma segura... Por favor esperá.";
+        document.getElementById('fileInfo').innerText = "";
+
         const reader = new FileReader();
         reader.onload = function(e) {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            
-            const json = XLSX.utils.sheet_to_json(worksheet);
-            
-            if(json.length === 0) {
-                alert("El archivo está vacío o no se pudo leer correctamente.");
-                return;
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                
+                const json = XLSX.utils.sheet_to_json(worksheet);
+                
+                if(json.length === 0) {
+                    showToast("El archivo está vacío o no es un reporte válido.", "error");
+                    resetDropZone();
+                    return;
+                }
+
+                datosOriginales = json.map(fila => {
+                    const valorNeto = limpiarNumeroSAP(fila["Valor neto"]);
+                    const ctdFacturada = Number(String(fila["Ctd.facturada"] || 0).replace(",", "."));
+
+                    return {
+                        fcInterna: fila["FC Interna"] || "",
+                        fcAfip: fila["FC AFIP"] || "",
+                        numMaterial: fila["Material"] || "",
+                        material: fila["Número de material"] || "",
+                        cantidad: isNaN(ctdFacturada) ? 0 : ctdFacturada,
+                        entrega: fila["Entrega"] || "",
+                        pedido: fila["Pedido"] || "",
+                        remito: fila["Remito"] || "",
+                        valorNeto: valorNeto,
+                        descuentosManuales: [], // Descuentos cargados individualmente
+                        descuentosMasivos: []   // Descuentos vinculados a las reglas masivas
+                    };
+                });
+
+                document.getElementById('fileInfo').innerText = "Último archivo cargado: " + file.name;
+                document.getElementById('secReglas').style.display = 'flex';
+                document.getElementById('secResultado').style.display = 'block';
+                reglasMasivas = [];
+                actualizarInterfazReglas();
+                renderizarTabla();
+                showToast("Archivo importado correctamente");
+            } catch (err) {
+                console.error(err);
+                showToast("Error al procesar el archivo Excel.", "error");
+            } finally {
+                resetDropZone();
             }
-
-            // Debug en consola F12
-            console.log("Primer objeto detectado por SheetJS:", json[0]);
-
-            // Mapeo corregido según los encabezados reales detectados
-            datosOriginales = json.map(fila => {
-                const valorNeto = limpiarNumeroSAP(fila["Valor neto"]);
-                const ctdFacturada = Number(String(fila["Ctd.facturada"] || 0).replace(",", "."));
-
-                return {
-                    fcInterna: fila["FC Interna"] || "",
-                    fcAfip: fila["FC AFIP"] || "",
-                    numMaterial: fila["Material"] || "",
-                    material: fila["Número de material"] || "",
-                    cantidad: isNaN(ctdFacturada) ? 0 : ctdFacturada,
-                    entrega: fila["Entrega"] || "",
-                    pedido: fila["Pedido"] || "",
-                    remito: fila["Remito"] || "",
-                    valorNeto: valorNeto,
-                    descuentosArr: [] 
-                };
-            });
-
-            document.getElementById('secReglas').style.display = 'flex';
-            document.getElementById('secResultado').style.display = 'block';
-            reglasMasivas = [];
-            actualizarInterfazReglas();
-            renderizarTabla();
         };
         reader.readAsArrayBuffer(file);
+    }
+
+    function resetDropZone() {
+        dropZone.classList.remove('loading');
+        dropZoneText.innerText = "Arrastrá acá tu archivo Excel exportado de SAP o hacé clic para seleccionar.";
     }
 
     function renderizarTabla() {
         const tbody = document.getElementById('cuerpoTabla');
         tbody.innerHTML = '';
 
+        let sumaTotalOriginal = 0;
         let sumaTotalNC = 0;
+        let sumaTotalNetoCorregido = 0;
 
         datosOriginales.forEach((fila, index) => {
-            let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosArr);
+            let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosManuales, fila.descuentosMasivos);
+            sumaTotalOriginal += fila.valorNeto;
             sumaTotalNC += calculo.montoNC;
+            sumaTotalNetoCorregido += calculo.netoCorregido;
 
             const tr = document.createElement('tr');
             tr.id = `fila_${index}`;
 
             let chipsHTML = `<div class="lista-chips-horizontal" id="chips_container_${index}">`;
-            fila.descuentosArr.forEach((desc, dIdx) => {
+            
+            // Renderizar chips manuales
+            fila.descuentosManuales.forEach((desc, dIdx) => {
                 chipsHTML += `
                     <span class="chip-desc">
                         ${desc}%
-                        <button class="btn-borrar-chip" onclick="eliminarDescuentoEspecifico(${index}, ${dIdx})">×</button>
+                        <button class="btn-borrar-chip" onclick="eliminarDescuentoManual(${index}, ${dIdx})">×</button>
                     </span>`;
             });
+            // Renderizar chips masivos (estilo diferente y no individuales)
+            fila.descuentosMasivos.forEach((desc) => {
+                chipsHTML += `
+                    <span class="chip-desc masivo" title="Aplicado por regla masiva">
+                        ${desc}% M
+                    </span>`;
+            });
+            
             chipsHTML += `</div>`;
 
             tr.innerHTML = `
@@ -434,20 +545,27 @@
             tbody.appendChild(tr);
         });
 
-        document.getElementById('totalNcCuadro').innerText = "$" + sumaTotalNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        actualizarBloqueTotales(sumaTotalOriginal, sumaTotalNC, sumaTotalNetoCorregido);
     }
 
     function actualizarValoresFilaDinamico(index) {
         let fila = datosOriginales[index];
-        let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosArr);
+        let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosManuales, fila.descuentosMasivos);
 
         let container = document.getElementById(`chips_container_${index}`);
         let chipsHTML = "";
-        fila.descuentosArr.forEach((desc, dIdx) => {
+        
+        fila.descuentosManuales.forEach((desc, dIdx) => {
             chipsHTML += `
                 <span class="chip-desc">
                     ${desc}%
-                    <button class="btn-borrar-chip" onclick="eliminarDescuentoEspecifico(${index}, ${dIdx})">×</button>
+                    <button class="btn-borrar-chip" onclick="eliminarDescuentoManual(${index}, ${dIdx})">×</button>
+                </span>`;
+        });
+        fila.descuentosMasivos.forEach((desc) => {
+            chipsHTML += `
+                <span class="chip-desc masivo" title="Aplicado por regla masiva">
+                    ${desc}% M
                 </span>`;
         });
         container.innerHTML = chipsHTML;
@@ -455,12 +573,24 @@
         document.getElementById(`monto_nc_${index}`).innerText = "$" + calculo.montoNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         document.getElementById(`neto_corregido_${index}`).innerHTML = "<strong>$" + calculo.netoCorregido.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + "</strong>";
 
+        let sumaTotalOriginal = 0;
         let sumaTotalNC = 0;
+        let sumaTotalNetoCorregido = 0;
+        
         datosOriginales.forEach(f => {
-            let c = calcularNetoConListaDescuentos(f.valorNeto, f.descuentosArr);
+            let c = calcularNetoConListaDescuentos(f.valorNeto, f.descuentosManuales, f.descuentosMasivos);
+            sumaTotalOriginal += f.valorNeto;
             sumaTotalNC += c.montoNC;
+            sumaTotalNetoCorregido += c.netoCorregido;
         });
-        document.getElementById('totalNcCuadro').innerText = "$" + sumaTotalNC.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        actualizarBloqueTotales(sumaTotalOriginal, sumaTotalNC, sumaTotalNetoCorregido);
+    }
+
+    function actualizarBloqueTotales(orig, nc, corr) {
+        document.getElementById('totalOriginalCuadro').innerText = "$" + orig.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('totalNcCuadro').innerText = "$" + nc.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('totalNetoCorregidoCuadro').innerText = "$" + corr.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     }
 
     function agregarDescuentoFila(index) {
@@ -470,7 +600,7 @@
 
         if (!isNaN(valor) && valor > 0) {
             if (valor > 100) valor = 100;
-            datosOriginales[index].descuentosArr.push(valor);
+            datosOriginales[index].descuentosManuales.push(valor);
             input.value = ''; 
             actualizarValoresFilaDinamico(index);
             input.focus();
@@ -479,8 +609,8 @@
         }
     }
 
-    function eliminarDescuentoEspecifico(filaIdx, descIdx) {
-        datosOriginales[filaIdx].descuentosArr.splice(descIdx, 1);
+    function eliminarDescuentoManual(filaIdx, descIdx) {
+        datosOriginales[filaIdx].descuentosManuales.splice(descIdx, 1);
         actualizarValoresFilaDinamico(filaIdx);
     }
 
@@ -489,15 +619,22 @@
         const porcentaje = parseFloat(document.getElementById('reglaPorcentaje').value);
 
         if(!texto || isNaN(porcentaje) || porcentaje <= 0) {
-            alert("Por favor completá el término de búsqueda y un porcentaje válido.");
+            showToast("Completá el término de búsqueda y un porcentaje válido.", "error");
             return;
         }
 
         reglasMasivas.push({ texto, porcentaje });
 
+        // Búsqueda inteligente por fragmentos/palabras en Código o Descripción
+        const palabrasBusqueda = texto.split(" ");
+
         datosOriginales.forEach(fila => {
-            if(String(fila.material).toUpperCase().includes(texto)) {
-                fila.descuentosArr.push(porcentaje);
+            const match = palabrasBusqueda.every(palabra => 
+                String(fila.material).toUpperCase().includes(palabra) || 
+                String(fila.numMaterial).toUpperCase().includes(palabra)
+            );
+            if(match) {
+                fila.descuentosMasivos.push(porcentaje);
             }
         });
 
@@ -505,6 +642,7 @@
         document.getElementById('reglaPorcentaje').value = '';
         actualizarInterfazReglas();
         renderizarTabla();
+        showToast(`Regla "${texto}" aplicada con éxito`);
     }
 
     function actualizarInterfazReglas() {
@@ -522,29 +660,47 @@
     }
 
     function eliminarReglaMasiva(idx) {
+        const reglaEliminada = reglasMasivas[idx].texto;
         reglasMasivas.splice(idx, 1);
-        datosOriginales.forEach(fila => fila.descuentosArr = []);
+        
+        // Se limpian SOLO los masivos. Los manuales quedan intactos e inmunes.
+        datosOriginales.forEach(fila => fila.descuentosMasivos = []);
+        
+        // Re-calcular reglas masivas vigentes
         reglasMasivas.forEach(r => {
+            const palabrasBusqueda = r.texto.split(" ");
             datosOriginales.forEach(fila => {
-                if(String(fila.material).toUpperCase().includes(r.texto)) {
-                    fila.descuentosArr.push(r.porcentaje);
+                const match = palabrasBusqueda.every(palabra => 
+                    String(fila.material).toUpperCase().includes(palabra) || 
+                    String(fila.numMaterial).toUpperCase().includes(palabra)
+                );
+                if(match) {
+                    fila.descuentosMasivos.push(r.porcentaje);
                 }
             });
         });
+        
         actualizarInterfazReglas();
         renderizarTabla();
+        showToast(`Se eliminó la regla "${reglaEliminada}"`);
     }
 
     function exportarExcel() {
         if(datosOriginales.length === 0) return;
 
+        let totalOriginalGeneral = 0;
         let totalNCGeneral = 0;
+        let totalNetoCorregidoGeneral = 0;
 
         const filasExportar = datosOriginales.map(fila => {
-            let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosArr);
+            let calculo = calcularNetoConListaDescuentos(fila.valorNeto, fila.descuentosManuales, fila.descuentosMasivos);
+            totalOriginalGeneral += fila.valorNeto;
             totalNCGeneral += calculo.montoNC;
+            totalNetoCorregidoGeneral += calculo.netoCorregido;
 
-            let stringDescuentos = fila.descuentosArr.map(d => d + '%').join(' + ');
+            // Se listan ambos tipos de descuentos en el detalle de la celda
+            const todosDescuentos = [...fila.descuentosManuales, ...fila.descuentosMasivos];
+            let stringDescuentos = todosDescuentos.map(d => d + '%').join(' + ');
 
             return {
                 'FC Interna': fila.fcInterna,
@@ -562,17 +718,32 @@
             };
         });
 
+        // Filas de totales estructuradas para informes estéticos
         filasExportar.push({});
         filasExportar.push({
-            'Descripción Material': 'TOTAL NC A EMITIR:',
-            'NC a emitir': totalNCGeneral
+            'Descripción Material': 'TOTAL ORIGINAL:',
+            'Valor Neto Original': totalOriginalGeneral,
+            'NC a emitir': totalNCGeneral,
+            'Valor Neto Corregido': totalNetoCorregidoGeneral
         });
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(filasExportar);
-        XLSX.utils.book_append_sheet(wb, ws, "Notas de Crédito");
+
+        // FORMATEO DE MONEDA NATIVA EN EXCEL (.z)
+        // Aplicamos formato de moneda argentina a las columnas I, K y L
+        for (let cell in ws) {
+            if (cell.startsWith('I') || cell.startsWith('K') || cell.startsWith('L')) {
+                if (ws[cell].v && !isNaN(ws[cell].v)) {
+                    ws[cell].t = 'n'; // Declarar formalmente como numérico
+                    ws[cell].z = '"$"#,##0.00;[Red]("$"#,##0.00);"-"'; // Estilo contable/moneda
+                }
+            }
+        }
         
+        XLSX.utils.book_append_sheet(wb, ws, "Notas de Crédito");
         XLSX.writeFile(wb, "SAP_Reporte_Notas_De_Credito.xlsx");
+        showToast("¡Archivo de Excel descargado con formatos!");
     }
 </script>
 
